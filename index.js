@@ -11,6 +11,9 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+app.use(bodyParser.json({ limit: '50mb' }));
+app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
+
 app.use(dataRouter);
 
 app.use(function(req, res, next) {
@@ -29,40 +32,3 @@ app.get('/', (request, response) => {
 app.listen(port, () => {
   console.log(`App is running on http://localhost:${port}`);
 });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// const productIds = products.map(product => product.prd_id); // Extract product IDs
-// const jobworkProductQuery = `
-//     INSERT INTO Jobwork_product (job_id, product_ids)
-//     VALUES ($1, $2)`;
-// const jobworkProductValues = [
-//     jobId,
-//     productIds // Pass array of product IDs
-// ];
-// await pool.query(jobworkProductQuery, jobworkProductValues);
