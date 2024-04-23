@@ -95,10 +95,10 @@ const updateTerms = async (request, response) => {
 const updateQuotation = async (request, response) => {
     const quotation_id = parseInt(request.params.quotation_id);
     const {
-        customer_id, company_id, est_caption, gst, rate, date, terms_conditions, document_no, Salesperson_id, Prepared_by, additional_text, additional_value, less_text, less_value, totalamount } = request.body;
+        customer_id, company_id, est_caption, gst, rate, date, terms_conditions, document_no, salesperson_id, prepared_by, additional_text, additional_value, less_text, less_value, totalamount } = request.body;
     try {
-        await pool.query('UPDATE quotation SET customer_id = $1,  company_id = $2,  est_caption = $3, gst = $4,  rate = $5, date = $6,   terms_conditions = $7,  document_no = $8,  Salesperson_id = $9,  Prepared_by = $10,  additional_text = $11,  additional_value = $12,  less_text = $13, less_value = $14, totalamount = $15 WHERE quotation_id = $16',
-            [customer_id, company_id, est_caption, gst, rate, date, terms_conditions, document_no, Salesperson_id, Prepared_by, additional_text, additional_value, less_text, less_value, totalamount, quotation_id]);
+        await pool.query('UPDATE quotation SET customer_id = $1,  company_id = $2,  est_caption = $3, gst = $4,  rate = $5, date = $6,   terms_conditions = $7,  document_no = $8,  salesperson_id = $9,  prepared_by = $10,  additional_text = $11,  additional_value = $12,  less_text = $13, less_value = $14, totalamount = $15 WHERE quotation_id = $16',
+            [customer_id, company_id, est_caption, gst, rate, date, terms_conditions, document_no, salesperson_id, prepared_by, additional_text, additional_value, less_text, less_value, totalamount, quotation_id]);
         response.status(200).json({ message: 'Quotation updated successfully' });
     } catch (error) {
         console.error('Error updating quotation:', error);

@@ -388,6 +388,9 @@ const getQuotationpdf = async (request, response) => {
         .quo {
             text-align: center;
             padding-right: 300px;
+            background-color:#7364FF;
+            color:#F5F5FA;
+            font-weight: bold;
         }
         .customer-name {
             font-size: 18px;
@@ -404,7 +407,6 @@ const getQuotationpdf = async (request, response) => {
         .customer-name label {
             width: 90px; 
             font-weight: bold;
-            color: #4682B4;
         }
         .table {
             width: 71%;
@@ -416,10 +418,10 @@ const getQuotationpdf = async (request, response) => {
         }
         .est-caption {
             text-align: center;
-            border: 1px solid #ccc; 
-            padding: 5px; 
-            background-color:#B0C4DE;
+            padding: 4px; 
+            background-color:#7364FF;
             padding-right: 300px;
+            color:#F5F5FA;
         }
         
         .amount { 
@@ -431,13 +433,12 @@ const getQuotationpdf = async (request, response) => {
             margin: 10px 0; 
         }
         .total-amount {
-            color: #4682B4;
+            color: #000000;
             font-weight: bold;
         }
         .image img {
             height: 100px; 
         }
-        
         .demo {
             display: flex;
             width: 100%;
@@ -493,14 +494,14 @@ const getQuotationpdf = async (request, response) => {
 
         html += `
         <hr>
-${quotation.est_caption ? `<div class="est-caption"><h2>${quotation.est_caption}</h2></div>` : ''}
+${quotation.est_caption ? `<div class="est-caption"><h2 style="font-weight: bold;">${quotation.est_caption}</h2></div>` : ''}
 `;
 
         for (const jobwork of jobworks) {
             html += `
                 <div class="containers"> 
                 <hr>
-                <h2 style="color: #4682B4;">${jobwork.jobwork_name} - ${jobwork.jobwork_description}</h2>
+                <h3 style="color: #7364FF; font-weight: bold;">${jobwork.jobwork_name} - ${jobwork.jobwork_description}</h3>
                 <table class="table">
                     <thead>
                         <tr>
@@ -542,14 +543,24 @@ ${quotation.est_caption ? `<div class="est-caption"><h2>${quotation.est_caption}
                 </div>
             `;
         }
-
+        const termsConditionsArray = quotation.terms_conditions.split(',').filter(Boolean).map(term => term.trim().replace(/[\[\]"]/g, ''));
+        html += `
+    <div>
+    <hr>
+        <h3  style="color: #7364FF; font-weight: bold;">Terms and Conditions</h3>
+        <ul>
+            ${termsConditionsArray.map(term => `<li>${term}</li>`).join('')}
+        </ul>
+    </div>
+`;
 
         html += `
         <hr>
         <div class="amount page-break">
-        <h3 style="color: #4682B4;">Amount Details</h3>
+        <h3 style="color: #7364FF; padding-left:8px; font-weight: bold;">Amount Details</h3>
         <table class="table" style="width: 60%; border-collapse: collapse; border: none">
             ${quotation.gst ? `
+            <hr>
                 <tr>
                     <td>GST</td>
                     <td>${quotation.gst}%</td>
@@ -574,17 +585,9 @@ ${quotation.est_caption ? `<div class="est-caption"><h2>${quotation.est_caption}
                 </tr>
             ` : ''}
         </table>
+        <hr>
     </div>
 
-`;
-        const termsConditionsArray = quotation.terms_conditions.split(',').filter(Boolean).map(term => term.trim().replace(/[\[\]"]/g, ''));
-        html += `
-    <div>
-        <h2>Terms and Conditions</h2>
-        <ul>
-            ${termsConditionsArray.map(term => `<li>${term}</li>`).join('')}
-        </ul>
-    </div>
 `;
         html += `
                 </div>
