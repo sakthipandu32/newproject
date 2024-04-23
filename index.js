@@ -24,11 +24,6 @@ app.use(function(req, res, next) {
   next();
 });
 
-app.get('/', (request, response) => {
-  response.json({ message: 'Hello World' });
-  console.log({ message: 'Hello World' });
-});
-
 app.listen(port, () => {
   console.log(`App is running on http://localhost:${port}`);
 });

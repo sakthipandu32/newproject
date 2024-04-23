@@ -370,14 +370,15 @@ const getQuotationpdf = async (request, response) => {
         <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
         <style>
         body {
-           width: 210mm; 
-           height: 297mm; 
-           margin: 0px;
-           padding: 0px;
-           font-family: "Times New Roman", Times, serif;
-           margin-down: 150px;
-           text-transform: capitalize;
-        }
+            width: 210mm; 
+            height: 297mm; 
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif; 
+            text-transform: capitalize;
+            margin-down: 150px;
+         }
+         
     
         .container {
           display: flex;
@@ -394,14 +395,14 @@ const getQuotationpdf = async (request, response) => {
             margin-top: 15px; 
         }
         .date {
-            padding-left: 500px;
+            padding-left: 480px;
         }
         .date label {
             width: 80px; 
             font-weight: bold;
         }
         .customer-name label {
-            width: 80px; 
+            width: 90px; 
             font-weight: bold;
             color: #4682B4;
         }
@@ -430,7 +431,6 @@ const getQuotationpdf = async (request, response) => {
             margin: 10px 0; 
         }
         .total-amount {
-            background-color:#B0C4DE;
             color: #4682B4;
             font-weight: bold;
         }
@@ -455,6 +455,10 @@ const getQuotationpdf = async (request, response) => {
         .tablehead{
             background-color:#B0C4DE;
         }
+        .page-break {
+            page-break-before: always; /* Creates a new page break */
+        }
+        
     
     </style>
     </head>
@@ -541,51 +545,37 @@ ${quotation.est_caption ? `<div class="est-caption"><h2>${quotation.est_caption}
 
 
         html += `
-    <hr>
-    <div class ="amount">
-        <h3 style="color: #4682B4; "> Amount Details </h3>
-        <table class="table" style="width: 60%; border-collapse: collapse; border: none">
-        
-`;
-
-        if (quotation.gst) {
-            html += `
-            <tr>
-                <td>GST</td>
-                <td>${quotation.gst}%</td>
-            </tr>
-    `;
-        }
-        if (quotation.additional_value) {
-            html += `
-            <tr>
-                <td>${quotation.additional_text}</td>
-                <td ">${quotation.additional_value}</td>
-            </tr>
-    `;
-        }
-
-        if (quotation.less_value) {
-            html += `
-            <tr>
-                <td>${quotation.less_text}</td>
-                <td>${quotation.less_value}%</td>
-            </tr>
-          
-    `;
-        }
-        if (quotation.totalamount) {
-            html += `
-            <tr class = "total-amount">
-                <td >Total Amount</td>
-                <td>${quotation.totalamount}</td>
-            </tr>
-    `;
-        }
-        html += `
-        </table>
-        </div>
         <hr>
+        <div class="amount page-break">
+        <h3 style="color: #4682B4;">Amount Details</h3>
+        <table class="table" style="width: 60%; border-collapse: collapse; border: none">
+            ${quotation.gst ? `
+                <tr>
+                    <td>GST</td>
+                    <td>${quotation.gst}%</td>
+                </tr>
+            ` : ''}
+            ${quotation.additional_value ? `
+                <tr>
+                    <td>${quotation.additional_text}</td>
+                    <td>${quotation.additional_value}</td>
+                </tr>
+            ` : ''}
+            ${quotation.less_value ? `
+                <tr>
+                    <td>${quotation.less_text}</td>
+                    <td>${quotation.less_value}%</td>
+                </tr>
+            ` : ''}
+            ${quotation.totalamount ? `
+                <tr class="total-amount">
+                    <td>Total Amount</td>
+                    <td>${quotation.totalamount}</td>
+                </tr>
+            ` : ''}
+        </table>
+    </div>
+
 `;
         const termsConditionsArray = quotation.terms_conditions.split(',').filter(Boolean).map(term => term.trim().replace(/[\[\]"]/g, ''));
         html += `
