@@ -32,26 +32,42 @@ const deleteCompany = async (request, response) => {
 const deleteJobwork = async (request, response) => {
   const jobwork_id = parseInt(request.params.jobwork_id);
 
-  pool.query('DELETE FROM jobwork WHERE jobwork_id = $1', [jobwork_id], (error) => {
-    if (error) {
-      throw error;
+  try {
+    const result = await pool.query('DELETE FROM jobwork WHERE jobwork_id = $1', [jobwork_id]);
+    if (result.rowCount === 0) {
+      response.status(404).send(`No jobwork found with ID: ${jobwork_id}`);
+    } else {
+      response.status(200).send(`Jobwork deleted with ID: ${jobwork_id}`);
     }
-    response.status(200).send(`employee deleted with ID: ${jobwork_id}`);
-  })
-}
+  } catch (error) {
+    if (error.code === '23503') {
+      response.status(400).send(`Cannot delete jobwork with ID: ${jobwork_id} because it is referenced by other records.`);
+    } else {
+      response.status(500).send(`An error occurred while trying to delete the jobwork: ${error.message}`);
+    }
+  }
+};
 
 
 //deleteunit...
 const deleteunit = async (request, response) => {
   const unit_id = parseInt(request.params.unit_id);
 
-  pool.query('DELETE FROM unit WHERE unit_id = $1', [unit_id], (error) => {
-    if (error) {
-      throw error;
+  try {
+    const result = await pool.query('DELETE FROM unit WHERE unit_id = $1', [unit_id]);
+    if (result.rowCount === 0) {
+      response.status(404).send(`Unit not found with ID: ${unit_id}`);
+    } else {
+      response.status(200).send(`Unit deleted with ID: ${unit_id}`);
     }
-    response.status(200).send(`employee deleted with ID: ${unit_id}`);
-  })
-}
+  } catch (error) {
+    if (error.code === '23503') {
+      response.status(400).send(`Cannot delete unit with ID: ${unit_id} because it is referenced by other records.`);
+    } else {
+      response.status(500).send(`An error occurred while trying to delete the unit: ${error.message}`);
+    }
+  }
+};
 
 
 //deleteproduct...
