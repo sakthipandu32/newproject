@@ -622,110 +622,6 @@ ${quotation.est_caption ? `<div class="est-caption"><h2 style="font-weight: bold
     }
 }
 
-const puppeteer = require('puppeteer');
-
-const    getPdf = async (req, res) => {
-  const { quotation_id } = req.params;
-
-  try {
-    const quotationQuery = `SELECT * FROM quotation WHERE quotation_id = $1`;
-    const quotationResult = await pool.query(quotationQuery, [quotation_id]);
-
-    if (quotationResult.rowCount === 0) {
-      res.status(404).send('Quotation not found');
-      return;
-    }
-
-    const quotation = quotationResult.rows[0];
-    const formattedDate = new Date(quotation.date).toLocaleDateString();
-
-    // Prepare the HTML content
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html lang="en">
-      <head>
-        <meta charset="UTF-8">
-        <title>Quotation Details</title>
-        <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
-        <style>
-          body {
-            font-family: Arial, sans-serif;
-            padding: 20px;
-          }
-          h1 {
-            color: blue;
-            text-align: center;
-          }
-          .quotation-info {
-            margin-bottom: 20px;
-          }
-          .terms {
-            margin-bottom: 20px;
-          }
-          .amount-details {
-            border-top: 1px solid #ccc;
-            padding-top: 10px;
-          }
-          .terms ul {
-            list-style-type: disc;
-            padding-left: 20px;
-          }
-        </style>
-      </head>
-      <body>
-        <h1>Quotation Details</h1>
-        <div class="quotation-info">
-          <p><strong>Quotation Type:</strong> ${quotation.quotation_type}</p>
-          <p><strong>Est Caption:</strong> ${quotation.est_caption || 'N/A'}</p>
-          <p><strong>Date:</strong> ${formattedDate}</p>
-        </div>
-
-        <div class="terms">
-          <h2>Terms & Conditions</h2>
-          <ul>
-            ${quotation.terms_conditions
-              .split(',')
-              .map(term => `<li>${term.trim()}</li>`)
-              .join('')}
-          </ul>
-        </div>
-
-        <div class="amount-details">
-          <h2>Amount Details</h2>
-          <p><strong>GST:</strong> ${quotation.gst || 'N/A'}%</p>
-          <p><strong>Additional:</strong> ${quotation.additional_value || 'N/A'}</p>
-          <p><strong>Less:</strong> ${quotation.less_value || 'N/A'}</p>
-          <p><strong>Total Amount:</strong> ${quotation.totalamount || 'N/A'}</p>
-        </div>
-      </body>
-      </html>
-    `;
-
-    // Use puppeteer to generate the PDF
-    const browser = await puppeteer.launch();
-    const page = await browser.newPage();
-    await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
-    
-    const pdfBuffer = await page.pdf({
-      format: 'A4',
-      printBackground: true,
-    });
-
-    await browser.close();
-
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="quotation_${quotation_id}.pdf"`);
-    res.send(pdfBuffer);
-  } catch (error) {
-    console.error('Error generating PDF:', error);
-    res.status(500).send('Internal Server Error');
-  }
-};
-
-
-
-
-
 
 //modules...
 module.exports = {
@@ -736,8 +632,7 @@ module.exports = {
     getSalesPerson,
     getQuotation,
     getQuotationpdf,
-    getDatas,
-    getPdf
+    getDatas
 }
 
 

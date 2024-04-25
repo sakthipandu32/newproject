@@ -14,7 +14,6 @@ router.get('/getsales', controller.getSalesPerson);
 router.get('/quotation/:quotationId', controller.getQuotation);
 router.get('/pdf/:quotationId/:showImageAndAddress', controller.getQuotationpdf);
 router.get('/getdata/:TableName', controller.getDatas);
-router.get('/getpdf/:quotation_id', controller.getPdf);
 
 //create...
 router.post('/company', create.createCompany);
