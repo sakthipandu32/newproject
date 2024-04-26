@@ -4,11 +4,11 @@ const pool = require('./db')
 //updateuser...
 const updateCustomer = async (request, response) => {
     const user_id = parseInt(request.params.user_id);
-    const { first_name, last_name, email_id, phone_no, alter_no, website, address1, address2, city, zip_code, user_role, bank_name, bank_branch, bank_ac_no, ifsc_number, customer_gst_number, user_password } = request.body;
+    const { first_name, last_name, email_id, phone_no, alter_no, website, address1, address2, city, zip_code, user_role, bank_name, bank_branch, bank_ac_no, ifsc_number, customer_gst_number } = request.body;
     try {
-        const hashedPassword = await bcrypt.hash(user_password, 10);
-        await pool.query('UPDATE "users" SET first_name = $1, last_name = $2, user_password = $3, email_id = $4, phone_no = $5, alter_no = $6, website = $7, address1 = $8, address2 = $9, city = $10, zip_code = $11, bank_name = $12, bank_branch = $13, bank_ac_no = $14, ifsc_number = $15, customer_gst_number = $16, user_role = $17 WHERE user_id = $18',
-            [first_name, last_name, hashedPassword, email_id, phone_no, alter_no, website, address1, address2, city, zip_code, bank_name, bank_branch, bank_ac_no, ifsc_number, customer_gst_number, user_role, user_id]);
+
+        await pool.query('UPDATE "users" SET first_name = $1, last_name = $2, email_id = $3, phone_no = $4, alter_no = $5, website = $6, address1 = $7, address2 = $8, city = $9, zip_code = $10, bank_name = $11, bank_branch = $12, bank_ac_no = $13, ifsc_number = $14, customer_gst_number = $15, user_role = $16 WHERE user_id = $17',
+            [first_name, last_name, email_id, phone_no, alter_no, website, address1, address2, city, zip_code, bank_name, bank_branch, bank_ac_no, ifsc_number, customer_gst_number, user_role, user_id]);
         response.status(201).json({ message: 'User details updated successfully' });
     } catch (error) {
         console.error('Error:', error);
@@ -93,18 +93,78 @@ const updateTerms = async (request, response) => {
 
 //updatequotations...
 const updateQuotation = async (request, response) => {
-    const quotation_id = parseInt(request.params.quotation_id);
-    const {
-        customer_id, company_id, est_caption, gst, rate, date, terms_conditions, document_no, salesperson_id, prepared_by, additional_text, additional_value, less_text, less_value, totalamount } = request.body;
+    const { quotationData, jobworkData } = request.body;
+    const { quotationId } = request.params;
     try {
-        await pool.query('UPDATE quotation SET customer_id = $1,  company_id = $2,  est_caption = $3, gst = $4,  rate = $5, date = $6,   terms_conditions = $7,  document_no = $8,  salesperson_id = $9,  prepared_by = $10,  additional_text = $11,  additional_value = $12,  less_text = $13, less_value = $14, totalamount = $15 WHERE quotation_id = $16',
-            [customer_id, company_id, est_caption, gst, rate, date, terms_conditions, document_no, salesperson_id, prepared_by, additional_text, additional_value, less_text, less_value, totalamount, quotation_id]);
-        response.status(200).json({ message: 'Quotation updated successfully' });
+      const quotationUpdateQuery = `
+        UPDATE quotation SET customer_id = $1, company_id = $2, gst = $3, rate = $4, date = $5, terms_conditions = $6, Salesperson_id = $7, Prepared_by = $8, additional_text = $9, additional_value = $10, less_text = $11, less_value = $12, est_caption = $13, totalamount = $14, quotation_type = $15 WHERE quotation_id = $16`;
+      const quotationUpdateValues = [
+        quotationData.customer_id,
+        quotationData.company_id,
+        quotationData.gst,
+        quotationData.rate,
+        quotationData.date,
+        quotationData.terms_conditions,
+        quotationData.Salesperson_id,
+        quotationData.Prepared_by,
+        quotationData.additional_text,
+        quotationData.additional_value,
+        quotationData.less_text,
+        quotationData.less_value,
+        quotationData.est_caption,
+        quotationData.totalamount,
+        quotationData.quotation_type,
+        quotationId
+      ];
+      await pool.query(quotationUpdateQuery, quotationUpdateValues);
+  
+      const deleteJobworkQuery = `
+        DELETE FROM quotation_jobwork
+        WHERE q_id = $1`;
+      await pool.query(deleteJobworkQuery, [quotationId]);
+  
+      for (const jobwork of jobworkData) {
+        const { job_id, jobwork_name, jobwork_description, productData } = jobwork
+        const jobworkInsertQuery = `
+          INSERT INTO quotation_jobwork (q_id, job_id, jobwork_name, jobwork_description)
+          VALUES ($1, $2, $3, $4)
+          RETURNING qj_id, job_id`;
+        const jobworkInsertValues = [
+          quotationId,
+          job_id,
+          jobwork_name,
+          jobwork_description
+        ];
+        const jobworkResult = await pool.query(jobworkInsertQuery, jobworkInsertValues);
+        const { qj_id } = jobworkResult.rows[0];
+
+        for (const product of productData) {
+          const productInsertQuery = `
+            INSERT INTO quotation_product (qj_id, prd_id, product_name, product_price, product_description, product_quantity, unit_type, amount)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`;
+          const productInsertValues = [
+            qj_id,
+            product.prd_id,
+            product.product_name,
+            product.product_price,
+            product.product_description,
+            product.product_quantity,
+            product.unit_type,
+            product.amount
+          ];
+         await pool.query(productInsertQuery, productInsertValues);
+        }
+      }
+
+      await pool.query('COMMIT');
+  
+      response.status(200).json({ message: 'Data updated successfully' });
     } catch (error) {
-        console.error('Error updating quotation:', error);
-        response.status(500).json({ error: 'Failed to update quotation' });
+      await pool.query('ROLLBACK');
+      response.status(500).json({ error: error.message });
+      console.error('Error updating data:', error.message);
     }
-};
+  };
 
 
 //update modules...
