@@ -11,9 +11,9 @@ router.post('/login', controller.login);
 router.post('/createuser', controller.createUser);
 router.get('/getcos', controller.getCustomer);
 router.get('/getsales', controller.getSalesPerson);
-router.get('/quotation/:quotationId', controller.getQuotation);
-router.get('/pdf/:quotationId/:showImageAndAddress', controller.getQuotationpdf);
-router.get('/getdata/:TableName', controller.getDatas);
+router.get('/pdf/:quotationId?/:showImageAndAddress', controller.getQuotationpdf);
+router.get('/quotation', controller.getQuotation);
+router.get('/getjob/:jobworkName', controller.getJobwork);
 
 //create...
 router.post('/company', create.createCompany);
@@ -22,7 +22,6 @@ router.post('/jobwork', create.createJob);
 router.post('/terms', create.TermsConditions);
 router.post('/product', create.createProduct);
 router.post('/quotation', create.insertQuotation);
-router.get('/getjob/:jobworkName', create.getJobwork);
 
 //update...
 router.put('/users/:user_id', update.updateCustomer);
@@ -31,7 +30,7 @@ router.put('/updatejob/:jobwork_id', update.updateJobwork);
 router.put('/updatepro/:product_id', update.updateProduct);
 router.put('/updateunit/:unit_id', update.updateUnit);
 router.put('/updatetc/:tc_id', update.updateTerms);
-router.put('/updatequotation/:quotation_id', update.updateQuotation);
+router.put('/updatequotation/:quotationId', update.updateQuotation);
 
 //delete...
 router.delete('/deletecom/:company_id', remove.deleteCompany);

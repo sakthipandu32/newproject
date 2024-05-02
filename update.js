@@ -1,4 +1,3 @@
-const bcrypt = require('bcrypt');
 const pool = require('./db')
 
 //updateuser...
@@ -6,7 +5,6 @@ const updateCustomer = async (request, response) => {
     const user_id = parseInt(request.params.user_id);
     const { first_name, last_name, email_id, phone_no, alter_no, website, address1, address2, city, zip_code, user_role, bank_name, bank_branch, bank_ac_no, ifsc_number, customer_gst_number } = request.body;
     try {
-
         await pool.query('UPDATE "users" SET first_name = $1, last_name = $2, email_id = $3, phone_no = $4, alter_no = $5, website = $6, address1 = $7, address2 = $8, city = $9, zip_code = $10, bank_name = $11, bank_branch = $12, bank_ac_no = $13, ifsc_number = $14, customer_gst_number = $15, user_role = $16 WHERE user_id = $17',
             [first_name, last_name, email_id, phone_no, alter_no, website, address1, address2, city, zip_code, bank_name, bank_branch, bank_ac_no, ifsc_number, customer_gst_number, user_role, user_id]);
         response.status(201).json({ message: 'User details updated successfully' });
@@ -15,7 +13,6 @@ const updateCustomer = async (request, response) => {
         response.status(500).json({ error: 'Internal server error' });
     }
 }
-
 
 // Define your updateCompany function
 const updateCompany = async (request, response) => {
@@ -32,7 +29,6 @@ const updateCompany = async (request, response) => {
         response.status(500).json({ error: 'Internal server error' });
     }
 }
-
 
 
 //updatejobwork...
@@ -83,7 +79,7 @@ const updateTerms = async (request, response) => {
     const { terms_conditions_name, tc_value } = request.body;
     try {
         await pool.query('UPDATE terms_condition SET terms_conditions_name = $1, tc_value = $2 WHERE tc_id = $3',
-            [terms_conditions_name, tc_value, tc_id]);
+            [terms_conditions_name, JSON.stringify(tc_value), tc_id]);
         response.status(201).json({ message: 'TermsConditions created successfully' });
     } catch (error) {
         console.error('Error:', error);
@@ -94,78 +90,67 @@ const updateTerms = async (request, response) => {
 //updatequotations...
 const updateQuotation = async (request, response) => {
     const { quotationData, jobworkData } = request.body;
-    const { quotationId } = request.params;
+    const quotationId = parseInt(request.params.quotationId);
+    const client = await pool.connect();
     try {
-      const quotationUpdateQuery = `
-        UPDATE quotation SET customer_id = $1, company_id = $2, gst = $3, rate = $4, date = $5, terms_conditions = $6, Salesperson_id = $7, Prepared_by = $8, additional_text = $9, additional_value = $10, less_text = $11, less_value = $12, est_caption = $13, totalamount = $14, quotation_type = $15 WHERE quotation_id = $16`;
-      const quotationUpdateValues = [
-        quotationData.customer_id,
-        quotationData.company_id,
-        quotationData.gst,
-        quotationData.rate,
-        quotationData.date,
-        quotationData.terms_conditions,
-        quotationData.Salesperson_id,
-        quotationData.Prepared_by,
-        quotationData.additional_text,
-        quotationData.additional_value,
-        quotationData.less_text,
-        quotationData.less_value,
-        quotationData.est_caption,
-        quotationData.totalamount,
-        quotationData.quotation_type,
-        quotationId
-      ];
-      await pool.query(quotationUpdateQuery, quotationUpdateValues);
-  
-      const deleteJobworkQuery = `
-        DELETE FROM quotation_jobwork
-        WHERE q_id = $1`;
-      await pool.query(deleteJobworkQuery, [quotationId]);
-  
-      for (const jobwork of jobworkData) {
-        const { job_id, jobwork_name, jobwork_description, productData } = jobwork
-        const jobworkInsertQuery = `
-          INSERT INTO quotation_jobwork (q_id, job_id, jobwork_name, jobwork_description)
-          VALUES ($1, $2, $3, $4)
-          RETURNING qj_id, job_id`;
-        const jobworkInsertValues = [
-          quotationId,
-          job_id,
-          jobwork_name,
-          jobwork_description
+        await client.query('BEGIN'); 
+
+        const updateQuotationQuery = `
+            UPDATE quotation SET customer_id = $1, company_id = $2, gst = $3, rate = $4, date = $5, terms_conditions = $6, salesperson_id = $7, prepared_by = $8, additional_text = $9,
+            additional_value = $10, less_text = $11, less_value = $12, est_caption = $13, totalamount = $14, quotation_type = $15 WHERE quotation_id = $16`;
+        const updateQuotationValues = [
+            quotationData.customer_id,
+            quotationData.company_id,
+            quotationData.gst,
+            quotationData.rate,
+            quotationData.date,
+            JSON.stringify(quotationData.terms_conditions),
+            quotationData.salesperson_id,
+            quotationData.prepared_by,
+            quotationData.additional_text,
+            quotationData.additional_value,
+            quotationData.less_text,
+            quotationData.less_value,
+            quotationData.est_caption,
+            quotationData.totalamount,
+            quotationData.quotation_type,
+            quotationId,
         ];
-        const jobworkResult = await pool.query(jobworkInsertQuery, jobworkInsertValues);
-        const { qj_id } = jobworkResult.rows[0];
+        await client.query(updateQuotationQuery, updateQuotationValues);
 
-        for (const product of productData) {
-          const productInsertQuery = `
-            INSERT INTO quotation_product (qj_id, prd_id, product_name, product_price, product_description, product_quantity, unit_type, amount)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`;
-          const productInsertValues = [
-            qj_id,
-            product.prd_id,
-            product.product_name,
-            product.product_price,
-            product.product_description,
-            product.product_quantity,
-            product.unit_type,
-            product.amount
-          ];
-         await pool.query(productInsertQuery, productInsertValues);
+            for (const jobwork of jobworkData) {
+                const { qj_id, q_id, job_id, jobwork_name, jobwork_description, productData } = jobwork;
+    
+                const updateJobworkQuery = `
+                    UPDATE quotation_jobwork SET  jobwork_name = $1, jobwork_description = $2, q_id = $3, job_id = $4 WHERE qj_id = $5`;
+                const updateJobworkValues = [
+                    jobwork_name,  jobwork_description, q_id, job_id, qj_id 
+                ];
+            await client.query(updateJobworkQuery, updateJobworkValues);
+
+            for (const product of productData) {
+                const { qp_id, qj_id, prd_id,product_name, product_price, product_description, product_quantity, unit_type, amount, other_productname } = product;
+
+                const updateProductQuery = `
+                    UPDATE quotation_product SET product_name = $1, product_price = $2, product_description = $3, product_quantity = $4, unit_type = $5, amount = $6, other_productname = $7, qj_id = $8, prd_id = $9 WHERE qp_id = $10 `;
+                const updateProductValues = [
+                    product_name, product_price, product_description, product_quantity, unit_type, amount, other_productname, qj_id, prd_id, qp_id,
+                ];
+                await client.query(updateProductQuery, updateProductValues);
+            }
         }
-      }
 
-      await pool.query('COMMIT');
-  
-      response.status(200).json({ message: 'Data updated successfully' });
+        await client.query('COMMIT');
+
+        response.status(200).json({ message: 'Quotation and associated data updated successfully' });
     } catch (error) {
-      await pool.query('ROLLBACK');
-      response.status(500).json({ error: error.message });
-      console.error('Error updating data:', error.message);
+        await client.query('ROLLBACK'); 
+        response.status(500).json({ error: error.message });
+        console.error("Error updating data: " + error.message);
+    } finally {
+        client.release();
     }
-  };
-
+};
 
 //update modules...
 module.exports = {

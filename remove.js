@@ -29,21 +29,24 @@ const deleteCompany = async (request, response) => {
 
 
 //deletejobwork...
-const deleteJobwork = async (request, response) => {
-  const jobwork_id = parseInt(request.params.jobwork_id);
+const deleteJobwork = async (req, res) => {
+  const jobwork_id = parseInt(req.params.jobwork_id);
 
   try {
     const result = await pool.query('DELETE FROM jobwork WHERE jobwork_id = $1', [jobwork_id]);
+
     if (result.rowCount === 0) {
-      response.status(404).send(`No jobwork found with ID: ${jobwork_id}`);
-    } else {
-      response.status(200).send(`Jobwork deleted with ID: ${jobwork_id}`);
+      return res.status(404).send(`No jobwork found with ID: ${jobwork_id}`);
     }
+
+    res.status(200).send(`Jobwork deleted with ID: ${jobwork_id}`);
   } catch (error) {
     if (error.code === '23503') {
-      response.status(400).send(`Cannot delete jobwork with ID: ${jobwork_id} because it is referenced by other records.`);
+      return res
+        .status(200) 
+        .send(`Jobwork cannot be deleted because it is referenced by other records.`);
     } else {
-      response.status(500).send(`An error occurred while trying to delete the jobwork: ${error.message}`);
+      return res.status(500).send(`An error occurred while trying to delete the jobwork: ${error.message}`);
     }
   }
 };
@@ -56,15 +59,14 @@ const deleteunit = async (request, response) => {
   try {
     const result = await pool.query('DELETE FROM unit WHERE unit_id = $1', [unit_id]);
     if (result.rowCount === 0) {
-      response.status(404).send(`Unit not found with ID: ${unit_id}`);
-    } else {
-      response.status(200).send(`Unit deleted with ID: ${unit_id}`);
+      return response.status(404).send(`Unit not found with ID: ${unit_id}`);
     }
+      response.status(200).send(`Unit deleted with ID: ${unit_id}`);
   } catch (error) {
     if (error.code === '23503') {
-      response.status(400).send(`Cannot delete unit with ID: ${unit_id} because it is referenced by other records.`);
+      return response.status(200).send(`Cannot delete unit because it is referenced by other records.`);
     } else {
-      response.status(500).send(`An error occurred while trying to delete the unit: ${error.message}`);
+      return response.status(500).send(`An error occurred while trying to delete the unit: ${error.message}`);
     }
   }
 };

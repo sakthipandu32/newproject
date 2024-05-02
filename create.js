@@ -7,7 +7,7 @@ const createCompany = async (request, response) => {
         const companyCheckQuery = 'SELECT * FROM company WHERE company_name = $1';
         const companyCheckResult = await pool.query(companyCheckQuery, [company_name]);
         if (companyCheckResult.rows.length > 0) {
-            return response.status(400).json({ error: 'Email already exists' });
+            return response.status(200).json({ error: 'Company already exists' });
         }
         await pool.query(`INSERT INTO company ( company_name, address1, address2, city, zip_code, company_email_id, company_phone_no, company_website, company_logo, bank_name, bank_branch, bank_ac_no, ifsc_number, company_gst_number)
                           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
@@ -26,6 +26,11 @@ const createJob = async (request, response) => {
         return response.status(400).json({ error: 'Missing required fields' });
     }
     try {
+        const jobCheckQuery = 'SELECT * FROM jobwork WHERE jobwork_name = $1';
+        const jobCheckResult = await pool.query(jobCheckQuery, [jobwork_name]);
+        if (jobCheckResult.rows.length > 0) {
+            return response.status(200).json({ error: 'jobwork already exists' });
+        }
         await pool.query('INSERT INTO jobwork (jobwork_name, jobwork_description) VALUES ($1, $2)',
             [jobwork_name, jobwork_description]);
         response.status(201).json({ message: 'Jobwork created successfully' });
@@ -43,7 +48,7 @@ const TermsConditions = async (request, response) => {
     }
     try {
         await pool.query('INSERT INTO terms_condition (terms_conditions_name, tc_value) VALUES ($1, $2)',
-            [terms_conditions_name, tc_value]);
+            [terms_conditions_name, JSON.stringify(tc_value)]);
         response.status(201).json({ message: 'TermsConditions created successfully' });
     } catch (error) {
         console.error('Error:', error);
@@ -58,6 +63,11 @@ const createUnit = async (request, response) => {
         return response.status(400).json({ error: 'Missing required fields' });
     }
     try {
+        const unitCheckQuery = 'SELECT * FROM unit WHERE unit_type = $1';
+        const unitCheckResult = await pool.query(unitCheckQuery, [unit_type]);
+        if (unitCheckResult.rows.length > 0) {
+            return response.status(200).json({ error: 'unit already exists' });
+        }
         await pool.query('INSERT INTO unit (unit_type, unit_text) VALUES ($1, $2)',
             [unit_type, unit_text]);
         response.status(201).json({ message: 'unit created successfully' });
@@ -98,7 +108,7 @@ const insertQuotation = async (request, response) => {
         const documentNo = `ES${formattedDate}${('000' + (lastDocumentNo + 1)).slice(-4)}`;
 
         const quotationQuery = `
-        INSERT INTO quotation (customer_id, company_id, gst, rate, date, terms_conditions, document_no, Salesperson_id, Prepared_by, additional_text, additional_value, less_text, less_value, est_caption, totalamount, quotation_type)
+        INSERT INTO quotation (customer_id, company_id, gst, rate, date, terms_conditions, document_no, salesperson_id, prepared_by, additional_text, additional_value, less_text, less_value, est_caption, totalamount, quotation_type)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
         RETURNING quotation_id`;
         const quotationValues = [
@@ -109,8 +119,8 @@ const insertQuotation = async (request, response) => {
             quotationData.date,
             JSON.stringify(quotationData.terms_conditions),
             documentNo,
-            quotationData.Salesperson_id,
-            quotationData.Prepared_by,
+            quotationData.salesperson_id,
+            quotationData.prepared_by,
             quotationData.additional_text,
             quotationData.additional_value,
             quotationData.less_text,
@@ -119,6 +129,7 @@ const insertQuotation = async (request, response) => {
             quotationData.totalamount,
             quotationData.quotation_type
         ];
+
         const quotationResult = await pool.query(quotationQuery, quotationValues);
         const quotationId = quotationResult.rows[0].quotation_id;
 
@@ -161,8 +172,8 @@ const insertQuotation = async (request, response) => {
                 let productPriceToStore = product.product_price || product.product_wholesale_price;
 
                 const productQuery = `
-                    INSERT INTO quotation_product (qj_id, prd_id, product_name, product_price, product_description, product_quantity, unit_type, amount)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                    INSERT INTO quotation_product (qj_id, prd_id, product_name, product_price, product_description, product_quantity, unit_type, amount, other_productname)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
                     RETURNING prd_id`;
                 const productValues = [
                     qj_id,
@@ -172,7 +183,8 @@ const insertQuotation = async (request, response) => {
                     product.product_description,
                     product.product_quantity,
                     product.unit_type,
-                    product.amount
+                    product.amount,
+                    product.other_productname
                 ];
                 const productResult = await pool.query(productQuery, productValues);
                 const prdId = productResult.rows[0].prd_id;
@@ -195,47 +207,6 @@ const insertQuotation = async (request, response) => {
 }
 
 
-const getJobwork = async (request, response) => {
-    try {
-        const { jobworkName } = request.params;
-
-        const query = `
-          SELECT j.jobwork_id, j.jobwork_name,
-                 p.product_id, p.product_name, p.product_price, p.product_description, p.product_wholesale_price,
-                 u.unit_id, u.unit_type
-          FROM jobwork j
-          LEFT JOIN product p ON j.jobwork_id = p.j_id
-          LEFT JOIN unit u ON p.u_id = u.unit_id
-          WHERE j.jobwork_name = $1
-        `;
-        const { rows } = await pool.query(query, [jobworkName]);
-
-        const result = rows.reduce((acc, row) => {
-            const { jobwork_id, jobwork_name, unit_id, unit_type, ...productData } = row;
-            if (!acc[jobwork_id]) {
-                acc[jobwork_id] = {
-                    jobwork_id,
-                    jobwork_name,
-                    products: [],
-                };
-            }
-            if (productData.product_id) {
-                productData.unit = { unit_id, unit_type };
-                delete productData.unit_id;
-                delete productData.unit_type;
-                acc[jobwork_id].products.push(productData);
-            }
-            return acc;
-        }, {});
-
-        response.status(200).json(Object.values(result));
-    } catch (error) {
-        console.error('Error:', error);
-        response.status(500).json({ error: 'Internal server error' });
-    }
-}
-
-
 
 //create modules...
 module.exports = {
@@ -245,5 +216,4 @@ module.exports = {
     createProduct,
     createUnit,
     insertQuotation,
-    getJobwork
 }

@@ -1,6 +1,5 @@
 const bcrypt = require('bcrypt');
 const pool = require('./db');
-const PDFDocument = require('pdfkit');
 const fs = require('fs');
 
 //create user...
@@ -70,7 +69,7 @@ const createUser = async (request, response) => {
             await pool.query(QJTableQuery);
         } if (!tableExistsResult.rows[0].exists) {
             const QPTableQuery =
-                ` CREATE TABLE IF NOT EXISTS  quotation_product ( qp_id SERIAL PRIMARY KEY, qj_id INT REFERENCES quotation_jobwork(qj_id), prd_id INT, product_name VARCHAR(250), product_price VARCHAR(250), product_description VARCHAR(250)  NULL, product_quantity VARCHAR(250), unit_type VARCHAR(250), amount VARCHAR(250))`;
+                ` CREATE TABLE IF NOT EXISTS  quotation_product ( qp_id SERIAL PRIMARY KEY, qj_id INT REFERENCES quotation_jobwork(qj_id), prd_id INT, product_name VARCHAR(250), product_price VARCHAR(250), product_description VARCHAR(250)  NULL, product_quantity VARCHAR(250), unit_type VARCHAR(250), amount VARCHAR(250), other_productname VARCHAR(250))`;
             await pool.query(QPTableQuery);
         }
         if (!tableExistsResult.rows[0].exists) {
@@ -108,26 +107,19 @@ const login = async (request, response) => {
             if (passwordMatch) {
                 const userRole = userResult.rows[0].user_role;
 
-                if (userRole === 'admin' || userRole === 'salesperson' || userRole === 'staff') {
-                    const [companyResult, jobworkResult, termsResult, productResult, unitResult, quotationResult] = await Promise.all([
-                        pool.query('SELECT * FROM company'),
-                        pool.query('SELECT * FROM jobwork'),
-                        pool.query('SELECT * FROM terms_condition'),
-                        pool.query('SELECT * FROM product'),
-                        pool.query('SELECT * FROM unit'),
-                        pool.query('SELECT * FROM quotation'),
-                    ]);
-                    const responseData = {
-                        user: userResult.rows,
-                        company: companyResult.rows,
-                        jobwork: jobworkResult.rows,
-                        terms_condition: termsResult.rows,
-                        product: productResult.rows,
-                        unit: unitResult.rows,
-                        quotation: quotationResult.rows
-                    };
+                if (userRole === 'admin' ) {
+                    const responseData = ['user', 'company', 'jobwork', 'terms&condition', 'product', 'unit', 'quotation']
                     response.json({ success: true, message: 'Login successful', data: responseData });
                     console.log({ success: true, message: 'Login successful', data: responseData });
+                } else if(userRole === 'salesperson'){
+                    const responseData = [ 'quotation']
+                    response.json({ success: true, message: 'Login successful', data: responseData });
+                    console.log({ success: true, message: 'Login successful', data: responseData });
+                }else if(userRole === 'staff'){
+                    const responseData = ['jobwork', 'terms&condition', 'product',  'unit','quotation']
+                    response.json({ success: true, message: 'Login successful', data: responseData });
+                    console.log({ success: true, message: 'Login successful', data: responseData });
+                    response.status(401).json({ success: false, message: 'Invalid user role' });
                 } else {
                     response.status(401).json({ success: false, message: 'Invalid user role' });
                 }
@@ -147,32 +139,7 @@ const login = async (request, response) => {
 //getdata...
 const getData = async (request, response) => {
     const TableName = request.params.TableName;
-    const { page = 1, limit } = request.query;
     try {
-        if (limit) {
-            const offset = (page - 1) * limit;
-            const { rows } = await pool.query(`SELECT * FROM ${TableName} LIMIT $1 OFFSET $2`, [limit, offset]);
-
-            if (rows.length > 0) {
-                const data = rows.map(row => {
-                    if (row.product_image) {
-                        const base64 = row.product_image;
-                        const src = "" + base64;
-                        row.editImage = src;
-                    }
-                    if (row.company_logo) {
-                        const base64 = row.company_logo;
-                        const src = "" + base64;
-                        row.editImage = src;
-                    }
-                    return row;
-                });
-                response.status(200).json({ TableName: data });
-                console.log(request.query)
-            } else {
-                response.status(404).json({ error: 'No data found' });
-            }
-        } else {
             const { rows } = await pool.query(`SELECT * FROM ${TableName}`);
 
             if (rows.length > 0) {
@@ -193,72 +160,7 @@ const getData = async (request, response) => {
             } else {
                 response.status(404).json({ error: 'No data found' });
             }
-        }
-    } catch (error) {
-        console.error('Error:', error.message);
-        response.status(500).json({ error: 'Failed to get data' });
-    }
-};
-
-const getDatas = async (request, response) => {
-    try {
-        const TableName = request.params.TableName;
-        const { filterColumn1, filterValue1, sort, page = 1, limit } = request.query;
-
-        let query = `SELECT * FROM ${TableName}`;
-        let queryParams = [];
-        let filterConditions = [];
-        let paramCount = 1;
-
-        if (filterColumn1 && filterValue1) {
-            filterConditions.push(`${filterColumn1} LIKE $${paramCount}`);
-            queryParams.push(`${filterValue1}%`);
-            paramCount++;
-        }
-
-        if (filterConditions.length > 0) {
-            query += ` WHERE ${filterConditions.join(' AND ')}`;
-        }
-
-        if (sort) {
-            const sortParts = sort.split(':');
-            if (sortParts.length === 2) {
-                const [sortColumn, sortOrder] = sortParts;
-                const sanitizedSortOrder = sortOrder.toLowerCase() === 'desc' ? 'DESC' : 'ASC';
-                query += ` ORDER BY ${sortColumn} ${sanitizedSortOrder}`;
-            } else {
-                throw new Error('Invalid format for sort parameter');
-            }
-        }
-
-        if (page > 0) {
-            if (limit) {
-                const offset = (page - 1) * limit;
-                query += ` LIMIT $${paramCount} OFFSET $${paramCount + 1}`;
-                queryParams.push(parseInt(limit), offset);
-            }
-        }
-
-        const { rows } = await pool.query(query, queryParams);
-
-        if (rows.length > 0) {
-            const data = rows.map(row => {
-                if (row.product_image) {
-                    const base64 = row.product_image;
-                    const src = "" + base64;
-                    row.editImage = src;
-                }
-                if (row.company_logo) {
-                    const base64 = row.company_logo;
-                    const src = "" + base64;
-                    row.editImage = src;
-                }
-                return row;
-            });
-            response.status(200).json({ [TableName]: data });
-        } else {
-            response.status(404).json({ error: 'No data found' });
-        }
+        
     } catch (error) {
         console.error('Error:', error.message);
         response.status(500).json({ error: 'Failed to get data' });
@@ -292,54 +194,136 @@ const getSalesPerson = async (request, response) => {
 };
 
 //getquotation...
-const getQuotation = async (request, response) => {
-    const { quotationId } = request.params;
-
+const getQuotation = async (req, res) => {
     try {
-        const quotationQuery = `
-            SELECT * FROM quotation WHERE quotation_id = $1`;
-        const quotationValues = [quotationId];
-        const quotationResult = await pool.query(quotationQuery, quotationValues);
-        const quotation = quotationResult.rows[0];
+        const quotationQuery = 'SELECT * FROM quotation';
+        const quotationResult = await pool.query(quotationQuery);
 
-        const jobworkQuery = `
-            SELECT * FROM quotation_jobwork WHERE q_id = $1`;
-        const jobworkValues = [quotationId];
-        const jobworkResult = await pool.query(jobworkQuery, jobworkValues);
-        const jobworks = jobworkResult.rows;
-
-        for (const jobwork of jobworks) {
-            const productIdQuery = `
-                SELECT * FROM quotation_product WHERE qj_id = $1`;
-            const productIdValues = [jobwork.qj_id];
-            const productIdResult = await pool.query(productIdQuery, productIdValues);
-            const productIds = productIdResult.rows;
-            jobwork.productIds = productIds;
+        if (quotationResult.rowCount === 0) {
+            return res.status(404).json({ error: 'No quotations found' });
         }
 
-        response.status(200).json({ quotation, jobworks });
+        const quotations = [];
+
+        for (const quotationRow of quotationResult.rows) {
+            const jobworkQuery = 'SELECT * FROM quotation_jobwork WHERE q_id = $1';
+            const jobworkValues = [quotationRow.quotation_id];
+            const jobworkResult = await pool.query(jobworkQuery, jobworkValues);
+
+            const jobworks = [];
+            for (const jobworkRow of jobworkResult.rows) {
+                const productQuery = 'SELECT * FROM quotation_product WHERE qj_id = $1';
+                const productValues = [jobworkRow.qj_id];
+                const productResult = await pool.query(productQuery, productValues);
+                jobworkRow.productData = productResult.rows;
+                jobworks.push(jobworkRow);
+            }
+            const formattedQuotation = {
+                quotationData: {
+                    quotation_id: quotationRow.quotation_id,
+                    customer_id: quotationRow.customer_id,
+                    company_id: quotationRow.company_id,
+                    gst: quotationRow.gst,
+                    rate: quotationRow.rate,
+                    date: quotationRow.date,
+                    terms_conditions: quotationRow.terms_conditions,
+                    Salesperson_id: quotationRow.Salesperson_id,
+                    Prepared_by: quotationRow.Prepared_by,
+                    additional_text: quotationRow.additional_text,
+                    additional_value: quotationRow.additional_value,
+                    less_text: quotationRow.less_text,
+                    less_value: quotationRow.less_value,
+                    est_caption: quotationRow.est_caption,
+                    totalamount: quotationRow.totalamount,
+                    quotation_type: quotationRow.quotation_type,
+                },
+                jobworkData: jobworks,
+            };
+            quotations.push(formattedQuotation);
+        }
+        res.status(200).json({ quotations });
     } catch (error) {
-        response.status(500).json({ error: error.message });
-        throw new Error("Error fetching quotation data: " + error.message);
+        console.error('Error fetching quotations:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+
+const getJobwork = async (request, response) => {
+    try {
+        const { jobworkName } = request.params;
+
+        const query = `
+          SELECT j.jobwork_id, j.jobwork_name,
+                 p.product_id, p.product_name, p.product_price, p.product_description, p.product_wholesale_price,
+                 u.unit_id, u.unit_type
+          FROM jobwork j
+          LEFT JOIN product p ON j.jobwork_id = p.j_id
+          LEFT JOIN unit u ON p.u_id = u.unit_id
+          WHERE j.jobwork_name = $1
+        `;
+        const { rows } = await pool.query(query, [jobworkName]);
+
+        const result = rows.reduce((acc, row) => {
+            const { jobwork_id, jobwork_name, unit_id, unit_type, ...productData } = row;
+            if (!acc[jobwork_id]) {
+                acc[jobwork_id] = {
+                    jobwork_id,
+                    jobwork_name,
+                    products: [],
+                };
+            }
+            if (productData.product_id) {
+                productData.unit = { unit_id, unit_type };
+                delete productData.unit_id;
+                delete productData.unit_type;
+                acc[jobwork_id].products.push(productData);
+            }
+            return acc;
+        }, {});
+
+        response.status(200).json(Object.values(result));
+    } catch (error) {
+        console.error('Error:', error);
+        response.status(500).json({ error: 'Internal server error' });
     }
 }
 
-//get quotation PDF...
-const pdf = require('html-pdf');
+
+const puppeteer = require('puppeteer');
+
+const getLastQuotationId = async () => {
+    const query = `SELECT quotation_id FROM quotation ORDER BY quotation_id DESC LIMIT 1`;
+    const result = await pool.query(query);
+
+    if (result.rows.length === 0) {
+        throw new Error('No quotations found');
+    }
+
+    return result.rows[0].quotation_id;
+};
 
 const getQuotationpdf = async (request, response) => {
-    const { quotationId, showImageAndAddress } = request.params;
+    let { quotationId, showImageAndAddress } = request.params;
+
     try {
         if (showImageAndAddress !== 'yes' && showImageAndAddress !== 'no') {
-            throw new Error('Invalid value for showImageAndAddress parameter. Only "yes" or "no" are allowed.');
+            return response.status(400).json({ error: 'Invalid value for showImageAndAddress' });
         }
 
+        if (!quotationId) {
+            quotationId = await getLastQuotationId();
+        }
         const quotationQuery = `SELECT * FROM quotation WHERE quotation_id = $1`;
-        const quotationValues = [quotationId];
-        const quotationResult = await pool.query(quotationQuery, quotationValues);
+        const quotationResult = await pool.query(quotationQuery, [quotationId]);
+
+        if (quotationResult.rows.length === 0) {
+            return response.status(404).json({ error: 'Quotation not found' });
+        }
+
         const quotation = quotationResult.rows[0];
 
-        const customerQuery = `SELECT first_name, last_name FROM users WHERE user_id = $1`;
+        const customerQuery = `SELECT first_name, last_name, city FROM users WHERE user_id = $1`;
         const customerValues = [quotation.customer_id];
         const customerResult = await pool.query(customerQuery, customerValues);
         const customer = customerResult.rows[0];
@@ -349,7 +333,8 @@ const getQuotationpdf = async (request, response) => {
         const salesResult = await pool.query(salesQuery, salesValues);
         const sales = salesResult.rows[0];
 
-        const companyQuery = `SELECT company_name FROM company WHERE company_id = $1`;
+        const companyQuery = `
+        SELECT company_name, company_logo, address1, company_phone_no FROM company WHERE company_id = $1 `;
         const companyValues = [quotation.company_id];
         const companyResult = await pool.query(companyQuery, companyValues);
         const company = companyResult.rows[0];
@@ -362,158 +347,177 @@ const getQuotationpdf = async (request, response) => {
         const jobworkResult = await pool.query(jobworkQuery, jobworkValues);
         const jobworks = jobworkResult.rows;
 
-        let html = `
+        const bootstrapCSS = `<link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">`;
+
+    const browser = await puppeteer.launch();
+            const page = await browser.newPage();
+        let html  = `
         <!DOCTYPE html>
         <html>
         <head>
-        <title>Quotation Details</title>
-        <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
-        <style>
-        body {
-            width: 210mm; 
-            height: 297mm; 
-            margin: 0;
-            padding: 0;
-            font-family: Arial, sans-serif; 
-            text-transform: capitalize;
-            margin-down: 150px;
-         }
-         
-    
-        .container {
-          display: flex;
-          align-items: center;
-          margin-down: 100px;
-        }
-        .quo {
-            text-align: center;
-            padding-right: 300px;
-            background-color:#7364FF;
-            color:#F5F5FA;
-            font-weight: bold;
-        }
-        .customer-name {
-            font-size: 18px;
-            padding-left: 5px; 
-            margin-top: 15px; 
-        }
-        .date {
-            padding-left: 480px;
-        }
-        .date label {
-            width: 80px; 
-            font-weight: bold;
-        }
-        .customer-name label {
-            width: 90px; 
-            font-weight: bold;
-        }
-        .table {
-            width: 71%;
-        }
-        .table th,
-        .table td{
-            padding: 5px;
-            border: none;
-        }
-        .est-caption {
-            text-align: center;
-            padding: 4px; 
-            background-color:#7364FF;
-            padding-right: 300px;
-            color:#F5F5FA;
-        }
-        
-        .amount { 
-            padding-left: 450px;   
-        }
-        hr {
-            border: none; 
-            border-top: 1px solid #ccc; 
-            margin: 10px 0; 
-        }
-        .total-amount {
-            color: #000000;
-            font-weight: bold;
-        }
-        .image img {
-            height: 100px; 
-        }
-        .demo {
-            display: flex;
-            width: 100%;
-        }
-        .image {
-            margin-right: 40px; /* Adjust the margin between image and address */
-        }
-        .address {
-            text-align: right;
-            padding-right:280px;
-        }
-        .containers{
-            padding-left:20px;
-        }
-        .tablehead{
-            background-color:#B0C4DE;
-        }
-        .page-break {
-            page-break-before: always; /* Creates a new page break */
-        }
-        
-    
-    </style>
-    </head>
-    <body>`
-        if (showImageAndAddress === 'yes') {
-            html += `
-    <div class="demo">
-        <div class="image">
-            <img src="https://i.ibb.co/5MnZ8FC/IMG-20240312-WA0000.jpg" alt="image logo">
+            <title>Quotation Details</title>
+            ${bootstrapCSS}
+            <style>
+                body {
+                    font-family: Arial, sans-serif;
+                    text-transform: capitalize;
+                    margin: 0;
+                    padding: 60px;
+                    font-size: 20px;
+                    page-break-before: always;
+                }
+                .quotation-header {
+                    text-align: center;
+                    
+                }
+                .est-caption {
+                    text-align: center;
+                    color: #6495ED;
+                }
+                .details {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: flex-start;
+                    margin-top: 30px;
+                }
+                .customer-info {
+                    font-size: 20px;
+                    line-height: 1.5;
+                    background-color: #E8E8E8;
+                    width: 470px;
+                    border-radius: 8px;
+                }
+                .right-info {
+                    font-size: 20px;
+                    line-height: 1.5;
+                    background-color: #E8E8E8;
+                    width: 470px;
+                    border-radius: 8px;
+                }
+                .company-address {
+                    text-align: right;
+                    line-height: 1.5;
+                }
+                .amount {
+                    padding-left: 650px;   
+                }
+                .total-amount {
+                    color: #111C43;
+                    font-weight: bold;
+                }
+                .table th,
+                .table td {
+                    padding: 6px;
+                    border: none;
+                }
+                .customer-info label {
+                    font-weight: bold;
+                }
+                .right-info label { 
+                    font-weight: bold;
+                }
+                
+                .container {
+                   page-break-after: always;
+                }.company-logo {
+                    height: 150px; 
+                    width: auto;
+                }
+                .head{
+                    font-weight: bold;
+                }
+                html {
+                    -webkit-print-color-adjust: exact;
+                  }
+                  .textcolor{
+                    color:#6495ED
+                  }
+                  #customers {
+                    font-family: Arial, Helvetica, sans-serif;
+                    width: 100%;
+                    
+                  }
+                  
+                  #customers td, #customers th {
+                    border: 1px solid #ddd;
+                    padding: 8px;
+                    border-collapse: collapse;
+                    border: none;
+                  }
+                  
+                  #customers tr:nth-child(even){background-color: #f2f2f2;}
+                  
+                  #customers th {
+                    padding-top: 12px;
+                    padding-bottom: 12px;
+                    text-align: left;
+                    background-color: #6495ED;
+                    color: white;
+                  }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                ${showImageAndAddress === 'yes' ? `
+                <div style="display: flex; align-items: center; justify-content: space-between; font-size: 20px;">
+                    <div>
+                        <img src="${company.company_logo}" alt="Company Logo" class="company-logo"> <!-- Changed -->
+                    </div>
+                    <div class="company-address">
+                    <p>Company- ${company.company_name}<br>
+                        ${company.address1}<br>
+                        Ph.no ${company.company_phone_no}</p>
+                    </div>
+                </div>
+                ` : ''}
+                <hr>
+            <div style="height: 10px;"></div>
+            <div class="quotation-header"><h1  class="textcolor head pb-3">${quotation.quotation_type}</h1></div>
+        <div class="details">
+        <div class="customer-info pl-4 pt-4 pb-4">
+            <h3 class = "pb-2  textcolor">Customer Info</h3>
+            <p><label>To.</label> ${customer.first_name} ${customer.last_name}<br>
+           ${customer.city}</p>
         </div>
-        <div class="address">
-            <p>No.5, Vjay Garden,Woraiyur,Kuzlumani Road,<br>
-            Near Lingam Nagar,Trichy-620003,<br>
-            Ph.no 0431-2761190,9865194799.</p>
+        <div class="right-info pl-4 pt-4 pb-4">
+            <p><label>Date:</label> ${formattedQuotationDate}<br>
+             <label>Document No:</label> ${quotation.document_no}<br>
+             <label>Salesperson:</label> ${sales.first_name} ${sales.last_name}</p>
         </div>
-    </div>`;
-        }
-        html += `
-<div class= "container">
-    <div>
-    <hr border-primary>
-        <h1 class="quo">${quotation.quotation_type}</h1>
-    <div class="date">
-    <p><label>Date</label>: ${formattedQuotationDate}</p>
-    <p><label>Doc</label>: ${quotation.document_no}</p>
-    <p><label>Sel.Rep</label>: ${sales.first_name} ${sales.last_name}</p>
-</div>
-<div class="customer-name">
-    <p><label>Name</label>: ${customer.first_name} ${customer.last_name}</p>
-    <p><label>Company</label>: ${company.company_name}</p>
-</div>`
+    </div>
+    `
+        
+    html  += `
+            <hr class="hr">
+            ${quotation.est_caption ? `
+                <div class="est-caption">
+                    <h2>${quotation.est_caption}</h2>
+                </div>
+            ` : ''}
+            `;
 
-        html += `
-        <hr>
-${quotation.est_caption ? `<div class="est-caption"><h2 style="font-weight: bold;">${quotation.est_caption}</h2></div>` : ''}
-`;
 
         for (const jobwork of jobworks) {
-            html += `
-                <div class="containers"> 
-                <hr>
-                <h3 style="color: #7364FF; font-weight: bold;">${jobwork.jobwork_name} - ${jobwork.jobwork_description}</h3>
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>Product Name</th>
-                            <th>Price</th>
-                            <th>Unit</th>
-                            <th>Quantity</th>
-                            <th>Amount</th>
-                        </tr>
-                    </thead>
-                    <tbody>
+            const jobworkHeading = jobwork.jobwork_description
+                ? `${jobwork.jobwork_name} - ${jobwork.jobwork_description}`
+                : jobwork.jobwork_name;
+        
+                html  += `
+                <div class="page-break "  >
+                    <h3 style="  font-weight: bold;" class="pt-4 textcolor">${jobworkHeading}</h3>
+                    <table id="customers">
+                        <thead>
+                            <tr>
+                                <th>Product Name</th>
+                                <th>Price</th>
+                                <th>Unit</th>
+                                <th>Quantity</th>
+                                <th>Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
             `;
+        
 
             const productQuery = `SELECT * FROM quotation_product WHERE qj_id = $1`;
             const productValues = [jobwork.qj_id];
@@ -521,106 +525,92 @@ ${quotation.est_caption ? `<div class="est-caption"><h2 style="font-weight: bold
             const products = productResult.rows;
 
             for (const product of products) {
-                // const unitQuery = `SELECT unit_type FROM unit WHERE unit_id = $1`;
-                // const unitValues = [product.unit_type];
-                // const unitResult = await pool.query(unitQuery, unitValues);
-                // const unit = unitResult.rows[0];
-
-                html += `
-                <tr>
-                    <td style="text-align: left;">${product.product_name}</td>
-                    <td >${product.product_price || product.product_wholesale_price} </td>
-                    <td>${product.unit_type}</td>
-                    <td>${product.product_quantity}</td>
-                    <td>${product.amount}</td>
-                </tr>
-            `;
+                html  += `
+                    <tr>
+                        <td>${product.product_name || product.other_productname}</td>
+                        <td>₹${product.product_price || product.product_wholesale_price}</td>
+                        <td>${product.unit_type}</td>
+                        <td>${product.product_quantity}</td>
+                        <td>₹${product.amount}</td>
+                    </tr>
+                `;
             }
 
-            html += `
-                    </tbody>
-                </table>
+            html  += `
+                        </tbody>
+                    </table>
                 </div>
             `;
         }
-        const termsConditionsArray = quotation.terms_conditions.split(',').filter(Boolean).map(term => term.trim().replace(/[\[\]"]/g, ''));
-        html += `
-    <div>
-    <hr>
-        <h3  style="color: #7364FF; font-weight: bold;">Terms and Conditions</h3>
-        <ul>
-            ${termsConditionsArray.map(term => `<li>${term}</li>`).join('')}
-        </ul>
-    </div>
-`;
 
-        html += `
+        html  += `
         <hr>
-        <div class="amount page-break">
-        <h3 style="color: #7364FF; padding-left:8px; font-weight: bold;">Amount Details</h3>
-        <table class="table" style="width: 60%; border-collapse: collapse; border: none">
-            ${quotation.gst ? `
+        <div class="amount">
+            <h3 style=" padding-left: 8px; font-weight: bold;" class="textcolor">Amount Details</h3>
+            <table class="table" style="width: 100%; border-collapse: collapse; border: none;">
+                ${quotation.gst ? `
+                    <tr>
+                        <td>GST</td>
+                        <td>${quotation.gst}%</td>
+                    </tr>
+                ` : ''}
+                ${quotation.additional_value ? `
+                    <tr>
+                        <td>${quotation.additional_text}</td>
+                        <td>₹${quotation.additional_value}</td>
+                    </tr>
+                ` : ''}
+                ${quotation.less_value ? `
+                    <tr>
+                        <td>${quotation.less_text}</td>
+                        <td>${quotation.less_value}%</td>
+                    </tr>
+                ` : ''}
+                ${quotation.totalamount ? `
+                    <tr class="total-amount " >
+                        <td>Total Amount</td>
+                        <td>₹${quotation.totalamount}</td>
+                    </tr>
+                ` : ''}
+            </table>
             <hr>
-                <tr>
-                    <td>GST</td>
-                    <td>${quotation.gst}%</td>
-                </tr>
-            ` : ''}
-            ${quotation.additional_value ? `
-                <tr>
-                    <td>${quotation.additional_text}</td>
-                    <td>${quotation.additional_value}</td>
-                </tr>
-            ` : ''}
-            ${quotation.less_value ? `
-                <tr>
-                    <td>${quotation.less_text}</td>
-                    <td>${quotation.less_value}%</td>
-                </tr>
-            ` : ''}
-            ${quotation.totalamount ? `
-                <tr class="total-amount">
-                    <td>Total Amount</td>
-                    <td>${quotation.totalamount}</td>
-                </tr>
-            ` : ''}
-        </table>
+        </div>
+        `;
+        html  += `
         <hr>
-    </div>
-
-`;
-        html += `
-                </div>
-            </body>
-            </html>
+        <div>
+            <h3 class="textcolor" font-weight: bold;">Terms and Conditions</h3>
+            <ul>
+                ${quotation.terms_conditions
+                    .split(',')
+                    .filter(Boolean)
+                    .map(term => `<li>${term.replace(/[\[\]{}"\\]/g, '').trim()}</li>`)
+                    .join('')}
+            </ul>
+        </div>
+        `;
+        html  += `
+        </div>
+        </body>
+        </html>
         `;
 
-        const options = {
-            format: 'A4',
-            orientation: 'portrait',
-            border: '10mm',
-            header: {
-                height: '5mm'
-            },
-            footer: {
-                height: '20mm'
-            }
-        };
+        // Create the PDF using Puppeteer
+   
 
-        pdf.create(html, options).toStream((err, stream) => {
-            if (err) {
-                console.error("Error generating PDF: " + err.message);
-                response.status(500).json({ error: "Error generating PDF: " + err.message });
-            } else {
-                response.setHeader('Content-Type', 'application/pdf');
-                stream.pipe(response);
-            }
-        });
+        await page.setContent(html);
+        const pdfBuffer = await page.pdf({ format: 'A4' });
+        fs.writeFileSync('test.pdf', pdfBuffer);
+
+        response.setHeader('Content-Type', 'application/pdf');
+        response.send(pdfBuffer);
+        await browser.close();
+
     } catch (error) {
-        console.error("Error fetching quotation data: " + error.message);
-        response.status(500).json({ error: "Qauotation not found" });
+        console.error("Error generating PDF: Someting Missing");
+        response.status(500).json({ error: `Error generating PDF: Someting Missing` });
     }
-}
+};
 
 
 //modules...
@@ -632,7 +622,7 @@ module.exports = {
     getSalesPerson,
     getQuotation,
     getQuotationpdf,
-    getDatas
+    getJobwork
 }
 
 
