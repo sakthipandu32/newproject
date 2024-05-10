@@ -11,7 +11,7 @@ const createCompany = async (request, response) => {
         }
         await pool.query(`INSERT INTO company ( company_name, address1, address2, city, zip_code, company_email_id, company_phone_no, company_website, company_logo, bank_name, bank_branch, bank_ac_no, ifsc_number, company_gst_number)
                           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
-                          [company_name, address1, address2, city, zip_code, company_email_id, company_phone_no, company_website, company_logo, bank_name, bank_branch, bank_ac_no, ifsc_number, company_gst_number]);
+            [company_name, address1, address2, city, zip_code, company_email_id, company_phone_no, company_website, company_logo, bank_name, bank_branch, bank_ac_no, ifsc_number, company_gst_number]);
         response.status(201).json({ message: 'Company details created successfully' });
     } catch (error) {
         console.error('Error:', error);
@@ -73,7 +73,7 @@ const createUnit = async (request, response) => {
         response.status(201).json({ message: 'unit created successfully' });
     } catch (error) {
         console.error('Error:', error);
-        response.status(500).json({ error: 'Internal server error' });
+        return response.status(500).json({ error: 'Internal server error' });
     }
 }
 
@@ -90,7 +90,7 @@ const createProduct = async (request, response) => {
         response.status(201).json({ message: 'Product created successfully' });
     } catch (error) {
         console.error('Error:', error);
-        response.status(500).json({ error: 'Internal server error' });
+        return response.status(200).json({ error: 'Internal server error' });
     }
 }
 
@@ -101,15 +101,17 @@ const insertQuotation = async (request, response) => {
         const currentDate = new Date();
         const formattedDate = currentDate.toISOString().slice(0, 10).replace(/-/g, '');
 
-        const lastQuotationQuery = `SELECT MAX(SUBSTRING(document_no, 11)::int) AS last_document_no FROM quotation WHERE document_no LIKE 'ES${formattedDate}%'`;
+        const QuotationType = quotationData.quotation_type === 'Estimates' ? 'EST' : 'QUO';
+
+        const lastQuotationQuery = `SELECT MAX(SUBSTRING(document_no, 11)::int) AS last_document_no FROM quotation WHERE document_no LIKE '${QuotationType}${formattedDate}%'`;
         const lastQuotationResult = await pool.query(lastQuotationQuery);
         const lastDocumentNo = lastQuotationResult.rows[0].last_document_no || 0;
 
-        const documentNo = `ES${formattedDate}${('000' + (lastDocumentNo + 1)).slice(-4)}`;
+        const documentNo = `${QuotationType}${formattedDate}${('000' + (lastDocumentNo + 1)).slice(-4)}`;
 
         const quotationQuery = `
-        INSERT INTO quotation (customer_id, company_id, gst, rate, date, terms_conditions, document_no, salesperson_id, prepared_by, additional_text, additional_value, less_text, less_value, est_caption, totalamount, quotation_type)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+        INSERT INTO quotation (customer_id, company_id, gst, rate, date, terms_conditions, document_no, salesperson_id, prepared_by, additional_text, additional_value, less_text, less_value, est_caption, totalamount, quotation_type, gst_amount, less_amount, lessvalue_amount)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
         RETURNING quotation_id`;
         const quotationValues = [
             quotationData.customer_id,
@@ -127,7 +129,10 @@ const insertQuotation = async (request, response) => {
             quotationData.less_value,
             quotationData.est_caption,
             quotationData.totalamount,
-            quotationData.quotation_type
+            quotationData.quotation_type,
+            quotationData.gst_amount,
+            quotationData.less_amount,
+            quotationData.lessvalue_amount
         ];
 
         const quotationResult = await pool.query(quotationQuery, quotationValues);
@@ -199,10 +204,9 @@ const insertQuotation = async (request, response) => {
                 await pool.query(jobworkProductQuery, jobworkProductValues);
             }
         }
-        response.status(201).json({ message: 'Data inserted successfully', documentNo });
+        response.status(201).json({ message: 'Data inserted successfully', quotationId, documentNo });
     } catch (error) {
-        response.status(500).json({ error: error.message });
-        console.error("Error inserting data: " + error.message);
+        return response.status(200).json({ message: 'invalid input Type for Quotation' });
     }
 }
 

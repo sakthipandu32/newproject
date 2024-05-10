@@ -61,7 +61,7 @@ const createUser = async (request, response) => {
                 est_caption VARCHAR(250),
                 gst VARCHAR(250), rate VARCHAR(250), date DATE,  
                 terms_conditions VARCHAR(250), document_no VARCHAR(250), salesperson_id INT, 
-                Prepared_by INT, additional_text VARCHAR(250),  additional_value VARCHAR(250), less_text VARCHAR(250), less_value VARCHAR(250), totalamount VARCHAR(250))`;
+                prepared_by INT, additional_text VARCHAR(250),  additional_value VARCHAR(250), less_text VARCHAR(250), less_value VARCHAR(250), totalamount VARCHAR(250), gst_amount VARCHAR(250), less_amount VARCHAR(250), lessvalue_amount VARCHAR(250))`;
             await pool.query(qoutationTableQuery);
         } if (!tableExistsResult.rows[0].exists) {
             const QJTableQuery =
@@ -95,8 +95,8 @@ const createUser = async (request, response) => {
 };
 
 //login...
-const login = async (request, response) => {
-    const { email_id, password } = request.body;
+const login = async (req, res) => {
+    const { email_id, password } = req.body;
     try {
         const userResult = await pool.query('SELECT * FROM "users" WHERE email_id = $1', [email_id]);
 
@@ -107,31 +107,82 @@ const login = async (request, response) => {
             if (passwordMatch) {
                 const userRole = userResult.rows[0].user_role;
 
-                if (userRole === 'admin' ) {
-                    const responseData = ['user', 'company', 'jobwork', 'terms&condition', 'product', 'unit', 'quotation']
-                    response.json({ success: true, message: 'Login successful', data: responseData });
-                    console.log({ success: true, message: 'Login successful', data: responseData });
-                } else if(userRole === 'salesperson'){
-                    const responseData = [ 'quotation']
-                    response.json({ success: true, message: 'Login successful', data: responseData });
-                    console.log({ success: true, message: 'Login successful', data: responseData });
-                }else if(userRole === 'staff'){
-                    const responseData = ['jobwork', 'terms&condition', 'product',  'unit','quotation']
-                    response.json({ success: true, message: 'Login successful', data: responseData });
-                    console.log({ success: true, message: 'Login successful', data: responseData });
-                    response.status(401).json({ success: false, message: 'Invalid user role' });
+                if (userRole === 'admin') {
+                    const responseData = ['user', 'company', 'jobwork', 'terms&condition', 'product', 'unit', 'quotation'];
+                    const salespersonId = userResult.rows[0].user_id;
+                    const userRole = userResult.rows[0].user_role;
+                    res.json({ success: true, message: 'Login successful', data: responseData, user_id: salespersonId, userRole });
+                } else if (userRole === 'salesperson') {
+                    const responseData = ['user', 'quotation'];
+                    const salespersonId = userResult.rows[0].user_id;
+                    const userRole = userResult.rows[0].user_role;
+                    res.json({ success: true, message: 'Login successful', data: responseData, user_id: salespersonId, userRole });
+                } else if (userRole === 'staff') {
+                    const responseData = ['jobwork', 'terms&condition', 'product', 'unit', 'quotation'];
+                    res.json({ success: true, message: 'Login successful', data: responseData });
                 } else {
-                    response.status(401).json({ success: false, message: 'Invalid user role' });
+                    res.status(401).json({ success: false, message: 'Invalid user role' });
                 }
             } else {
-                response.status(401).json({ success: false, message: 'Invalid credentials' });
+                res.status(401).json({ success: false, message: 'Invalid credentials' });
             }
         } else {
-            response.status(401).json({ success: false, message: 'Invalid credentials' });
+            res.status(401).json({ success: false, message: 'Invalid credentials' });
         }
     } catch (error) {
         console.error('Error executing query:', error);
-        response.status(500).json({ success: false, message: 'Internal server error' });
+        res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+};
+
+//forgot Password...
+const nodemailer = require('nodemailer');
+const generator = require('generate-password');
+
+const transporter = nodemailer.createTransport({
+    service: 'Gmail',
+    auth: {
+        user: 'sakthi032vel@gmail.com',
+        pass: 'ttjzpkoyqhgdzond',
+    }
+});
+
+const forgotPassword = async (req, res) => {
+    const { email_id } = req.body;
+
+    try {
+        const userResult = await pool.query('SELECT * FROM "users" WHERE email_id = $1', [email_id]);
+
+        if (userResult.rows.length === 0) {
+            return res.status(404).json({ success: false, message: 'User not found' });
+        }
+
+        const newPassword = generator.generate({ length: 10, numbers: true, uppercase: true, strict: true });
+
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        await pool.query(
+            'UPDATE "users" SET user_password = $1 WHERE email_id = $2',
+            [hashedPassword, email_id]
+        );
+
+        await transporter.sendMail({
+            from: 'sakthi032vel@gmail.com',
+            to: email_id,
+            subject: 'Password Reset',
+            html: `
+                <div style="font-family: Arial, sans-serif; padding: 20px;">
+                    <h1 style="color: #4A90E2;">Password Reset Instructions</h1>
+                    <p style="font-size: 16px; color: #333;">
+                        Your new password is: <strong style="font-size: 20px;">${newPassword}</strong>. Please change your password after logging in.
+                    </p>
+                </div>
+            `,
+        });
+        res.json({ success: true, message: 'Password reset email sent' });
+
+    } catch (error) {
+        console.error('Error during forgot-password:', error);
+        res.status(500).json({ success: false, message: 'Internal server error' });
     }
 };
 
@@ -139,34 +190,43 @@ const login = async (request, response) => {
 //getdata...
 const getData = async (request, response) => {
     const TableName = request.params.TableName;
-    try {
-            const { rows } = await pool.query(`SELECT * FROM ${TableName}`);
+    const orderBy = request.query.orderBy || TableName;
+    const orderDirection = request.query.orderDirection || 'ASC';
 
-            if (rows.length > 0) {
-                const data = rows.map(row => {
-                    if (row.product_image) {
-                        const base64 = row.product_image;
-                        const src = "" + base64;
-                        row.editImage = src;
-                    }
-                    if (row.company_logo) {
-                        const base64 = row.company_logo;
-                        const src = "" + base64;
-                        row.editImage = src;
-                    }
-                    return row;
-                });
-                response.status(200).json({ TableName: data });
-            } else {
-                response.status(404).json({ error: 'No data found' });
-            }
-        
+    try {
+        const query = `SELECT * FROM ${TableName} ORDER BY ${orderBy} ${orderDirection}`;
+        const { rows } = await pool.query(query);
+
+        if (rows.length > 0) {
+            const data = rows.map(row => {
+                if (row.tc_value) {
+                    const term = row.tc_value;
+                    const tc_value = term.replace(/[\[\]{}"\\]/g, ' ').trim();
+                    row.tc_value = tc_value;
+                }
+
+                if (row.product_image) {
+                    const base64 = row.product_image;
+                    const src = "" + base64;
+                    row.editImage = src;
+                }
+                if (row.company_logo) {
+                    const base64 = row.company_logo;
+                    const src = "" + base64;
+                    row.editImage = src;
+                }
+                return row;
+            });
+            response.status(200).json({ TableName: data });
+        } else {
+            return response.status(200).json({ error: 'No data found' });
+        }
+
     } catch (error) {
         console.error('Error:', error.message);
         response.status(500).json({ error: 'Failed to get data' });
     }
 };
-
 
 //getcustomer...
 const getCustomer = async (request, response) => {
@@ -194,61 +254,76 @@ const getSalesPerson = async (request, response) => {
 };
 
 //getquotation...
-const getQuotation = async (req, res) => {
+const getQuotation = async (request, response) => {
     try {
-        const quotationQuery = 'SELECT * FROM quotation';
+        const quotationQuery = `
+        SELECT * FROM quotation`;
         const quotationResult = await pool.query(quotationQuery);
+        const quotations = quotationResult.rows;
 
-        if (quotationResult.rowCount === 0) {
-            return res.status(404).json({ error: 'No quotations found' });
-        }
-
-        const quotations = [];
-
-        for (const quotationRow of quotationResult.rows) {
-            const jobworkQuery = 'SELECT * FROM quotation_jobwork WHERE q_id = $1';
-            const jobworkValues = [quotationRow.quotation_id];
+        for (const quotation of quotations) {
+            const jobworkQuery = `
+          SELECT * FROM quotation_jobwork WHERE q_id = $1`;
+            const jobworkValues = [quotation.quotation_id];
             const jobworkResult = await pool.query(jobworkQuery, jobworkValues);
+            const jobworks = jobworkResult.rows;
 
-            const jobworks = [];
-            for (const jobworkRow of jobworkResult.rows) {
-                const productQuery = 'SELECT * FROM quotation_product WHERE qj_id = $1';
-                const productValues = [jobworkRow.qj_id];
+            for (const jobwork of jobworks) {
+                const productQuery = `
+            SELECT * FROM quotation_product WHERE qj_id = $1`;
+                const productValues = [jobwork.qj_id];
                 const productResult = await pool.query(productQuery, productValues);
-                jobworkRow.productData = productResult.rows;
-                jobworks.push(jobworkRow);
+
+                jobwork.productData = productResult.rows;
             }
-            const formattedQuotation = {
-                quotationData: {
-                    quotation_id: quotationRow.quotation_id,
-                    customer_id: quotationRow.customer_id,
-                    company_id: quotationRow.company_id,
-                    gst: quotationRow.gst,
-                    rate: quotationRow.rate,
-                    date: quotationRow.date,
-                    terms_conditions: quotationRow.terms_conditions,
-                    Salesperson_id: quotationRow.Salesperson_id,
-                    Prepared_by: quotationRow.Prepared_by,
-                    additional_text: quotationRow.additional_text,
-                    additional_value: quotationRow.additional_value,
-                    less_text: quotationRow.less_text,
-                    less_value: quotationRow.less_value,
-                    est_caption: quotationRow.est_caption,
-                    totalamount: quotationRow.totalamount,
-                    quotation_type: quotationRow.quotation_type,
-                },
-                jobworkData: jobworks,
-            };
-            quotations.push(formattedQuotation);
+            quotation.jobworkData = jobworks;
         }
-        res.status(200).json({ quotations });
+        response.status(200).json({ quotations });
     } catch (error) {
+        response.status(500).json({ error: 'Internal server error' });
         console.error('Error fetching quotations:', error);
-        res.status(500).json({ error: 'Internal server error' });
     }
 };
 
 
+//get salesperson quotation...
+const getSalespersonQuotations = async (request, response) => {
+    const { salespersonId } = request.params;
+    try {
+        const quotationQuery = `
+        SELECT * FROM quotation WHERE salesperson_id = $1`;
+        const quotationResult = await pool.query(quotationQuery, [salespersonId]);
+
+        if (quotationResult.rowCount === 0) {
+            return response.status(200).json({ error: 'No quotations found' });
+        }
+        const quotations = quotationResult.rows;
+
+        for (const quotation of quotations) {
+            const jobworkQuery = `
+          SELECT * FROM quotation_jobwork WHERE q_id = $1`;
+            const jobworkValues = [quotation.quotation_id];
+            const jobworkResult = await pool.query(jobworkQuery, jobworkValues);
+            const jobworks = jobworkResult.rows;
+
+            for (const jobwork of jobworks) {
+                const productQuery = `
+            SELECT * FROM quotation_product WHERE qj_id = $1`;
+                const productValues = [jobwork.qj_id];
+                const productResult = await pool.query(productQuery, productValues);
+
+                jobwork.productData = productResult.rows;
+            }
+            quotation.jobworkData = jobworks;
+        }
+        response.status(200).json({ quotations });
+    } catch (error) {
+        response.status(500).json({ error: 'Internal server error' });
+        console.error('Error fetching quotations:', error);
+    }
+};
+
+//get jobwork...
 const getJobwork = async (request, response) => {
     try {
         const { jobworkName } = request.params;
@@ -281,7 +356,6 @@ const getJobwork = async (request, response) => {
             }
             return acc;
         }, {});
-
         response.status(200).json(Object.values(result));
     } catch (error) {
         console.error('Error:', error);
@@ -290,18 +364,8 @@ const getJobwork = async (request, response) => {
 }
 
 
+//quotation pdf...
 const puppeteer = require('puppeteer');
-
-const getLastQuotationId = async () => {
-    const query = `SELECT quotation_id FROM quotation ORDER BY quotation_id DESC LIMIT 1`;
-    const result = await pool.query(query);
-
-    if (result.rows.length === 0) {
-        throw new Error('No quotations found');
-    }
-
-    return result.rows[0].quotation_id;
-};
 
 const getQuotationpdf = async (request, response) => {
     let { quotationId, showImageAndAddress } = request.params;
@@ -310,10 +374,10 @@ const getQuotationpdf = async (request, response) => {
         if (showImageAndAddress !== 'yes' && showImageAndAddress !== 'no') {
             return response.status(400).json({ error: 'Invalid value for showImageAndAddress' });
         }
+        // if (Signature !== 'yes' && Signature !== 'no') {
+        //     return response.status(400).json({ error: 'Invalid value for Signature' });
+        // }
 
-        if (!quotationId) {
-            quotationId = await getLastQuotationId();
-        }
         const quotationQuery = `SELECT * FROM quotation WHERE quotation_id = $1`;
         const quotationResult = await pool.query(quotationQuery, [quotationId]);
 
@@ -349,9 +413,9 @@ const getQuotationpdf = async (request, response) => {
 
         const bootstrapCSS = `<link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">`;
 
-    const browser = await puppeteer.launch();
-            const page = await browser.newPage();
-        let html  = `
+        const browser = await puppeteer.launch();
+        const page = await browser.newPage();
+        let html = `
         <!DOCTYPE html>
         <html>
         <head>
@@ -399,7 +463,7 @@ const getQuotationpdf = async (request, response) => {
                     line-height: 1.5;
                 }
                 .amount {
-                    padding-left: 650px;   
+                    padding-left: 370px;   
                 }
                 .total-amount {
                     color: #111C43;
@@ -444,9 +508,7 @@ const getQuotationpdf = async (request, response) => {
                     border-collapse: collapse;
                     border: none;
                   }
-                  
-                  #customers tr:nth-child(even){background-color: #f2f2f2;}
-                  
+
                   #customers th {
                     padding-top: 12px;
                     padding-bottom: 12px;
@@ -461,18 +523,18 @@ const getQuotationpdf = async (request, response) => {
                 ${showImageAndAddress === 'yes' ? `
                 <div style="display: flex; align-items: center; justify-content: space-between; font-size: 20px;">
                     <div>
-                        <img src="${company.company_logo}" alt="Company Logo" class="company-logo"> <!-- Changed -->
+                        <img src="${company.company_logo}" alt="Company Logo" class="company-logo"> 
                     </div>
                     <div class="company-address">
-                    <p>Company- ${company.company_name}<br>
-                        ${company.address1}<br>
-                        Ph.no ${company.company_phone_no}</p>
+                    <p> Company- ${company.company_name},<br>
+                        ${company.address1},<br>
+                        <i class="fa-solid fa-phone-volume">Ph.no - ${company.company_phone_no}</i></p>
                     </div>
                 </div>
                 ` : ''}
                 <hr>
             <div style="height: 10px;"></div>
-            <div class="quotation-header"><h1  class="textcolor head pb-3">${quotation.quotation_type}</h1></div>
+            <div class="quotation-header"><h2  class="textcolor">${quotation.quotation_type}</h2></div>
         <div class="details">
         <div class="customer-info pl-4 pt-4 pb-4">
             <h3 class = "pb-2  textcolor">Customer Info</h3>
@@ -486,8 +548,8 @@ const getQuotationpdf = async (request, response) => {
         </div>
     </div>
     `
-        
-    html  += `
+
+        html += `
             <hr class="hr">
             ${quotation.est_caption ? `
                 <div class="est-caption">
@@ -496,28 +558,31 @@ const getQuotationpdf = async (request, response) => {
             ` : ''}
             `;
 
+        html += `
+            <div>
+              <table id="customers">
+                <thead>
+                  <tr>
+                    <th>Product Name</th>
+                    <th>Price</th>
+                    <th>Unit</th>
+                    <th>Quantity</th>
+                    <th>Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+      `;
 
         for (const jobwork of jobworks) {
             const jobworkHeading = jobwork.jobwork_description
                 ? `${jobwork.jobwork_name} - ${jobwork.jobwork_description}`
                 : jobwork.jobwork_name;
-        
-                html  += `
-                <div class="page-break "  >
-                    <h3 style="  font-weight: bold;" class="pt-4 textcolor">${jobworkHeading}</h3>
-                    <table id="customers">
-                        <thead>
-                            <tr>
-                                <th>Product Name</th>
-                                <th>Price</th>
-                                <th>Unit</th>
-                                <th>Quantity</th>
-                                <th>Amount</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-            `;
-        
+
+            html += `
+                <tr>
+                  <td colspan="10" style="font-weight: bold; color:#6495ED ">${jobworkHeading}</td>
+                </tr>
+        `;
 
             const productQuery = `SELECT * FROM quotation_product WHERE qj_id = $1`;
             const productValues = [jobwork.qj_id];
@@ -525,81 +590,122 @@ const getQuotationpdf = async (request, response) => {
             const products = productResult.rows;
 
             for (const product of products) {
-                html  += `
-                    <tr>
-                        <td>${product.product_name || product.other_productname}</td>
-                        <td>₹${product.product_price || product.product_wholesale_price}</td>
-                        <td>${product.unit_type}</td>
-                        <td>${product.product_quantity}</td>
-                        <td>₹${product.amount}</td>
-                    </tr>
+                const productName = product.product_name && product.product_name.toLowerCase().includes("others")
+                    ? product.other_productname
+                    : product.product_name;
+
+                html += `
+                  <tr>
+                    <td>${productName}</td>
+                    <td>₹${product.product_price || product.product_wholesale_price}</td>
+                    <td>${product.unit_type}</td>
+                    <td>${product.product_quantity}</td>
+                    <td>₹${product.amount}</td>
+                  </tr>
                 `;
             }
-
-            html  += `
-                        </tbody>
-                    </table>
-                </div>
-            `;
         }
 
-        html  += `
-        <hr>
-        <div class="amount">
-            <h3 style=" padding-left: 8px; font-weight: bold;" class="textcolor">Amount Details</h3>
-            <table class="table" style="width: 100%; border-collapse: collapse; border: none;">
-                ${quotation.gst ? `
-                    <tr>
-                        <td>GST</td>
-                        <td>${quotation.gst}%</td>
-                    </tr>
-                ` : ''}
-                ${quotation.additional_value ? `
-                    <tr>
-                        <td>${quotation.additional_text}</td>
-                        <td>₹${quotation.additional_value}</td>
-                    </tr>
-                ` : ''}
-                ${quotation.less_value ? `
-                    <tr>
-                        <td>${quotation.less_text}</td>
-                        <td>${quotation.less_value}%</td>
-                    </tr>
-                ` : ''}
-                ${quotation.totalamount ? `
-                    <tr class="total-amount " >
-                        <td>Total Amount</td>
-                        <td>₹${quotation.totalamount}</td>
-                    </tr>
-                ` : ''}
-            </table>
-            <hr>
-        </div>
-        `;
-        html  += `
-        <hr>
-        <div>
-            <h3 class="textcolor" font-weight: bold;">Terms and Conditions</h3>
-            <ul>
-                ${quotation.terms_conditions
+        html += `
+                </tbody>
+              </table>
+            </div>
+      `;
+
+        html += `
+<hr>
+    <h3 style="font-size=1px" class="textcolor">Amount Details</h3>
+    <div class="amount">
+    <table class="table" style="width: 85%; border-collapse: collapse; border: none;">
+        ${quotation.gst ? `
+        <tr>
+        <td>GST</td>
+        <td>
+            <div style="display: flex; justify-content: space-between;">
+                <span  style="padding-right: 200px"; >${quotation.gst}%</span>
+                <span style="text-align: right;">₹${quotation.gst_amount}</span>
+            </div>
+        </td>
+    </tr>
+        ` : ''}
+        ${quotation.additional_value ? `
+            <tr>
+                <td>${quotation.additional_text}</td>
+                <td style="text-align: right;">₹${quotation.additional_value}</td>
+            </tr>
+        ` : ''}
+        ${(quotation.less_value || quotation.less_amount) ? `
+        <tr>
+            <td>${quotation.less_text}</td>
+            <td>
+            <div style="display: flex; justify-content: space-between;">
+                <span>${quotation.less_value ? `${quotation.less_value}%` : ''}</span>
+                <span style="text-align: right;">−₹${quotation.lessvalue_amount || quotation.less_amount}</span>
+            </div>
+        </td>
+        </tr>
+        ` : ''}
+        ${quotation.totalamount ? `
+            <tr class="total-amount">
+                <td>Total Amount</td>
+                <td style="text-align: right;">₹${quotation.totalamount}</td>
+            </tr>
+        ` : ''}
+    </table>
+    <hr>
+</div>
+`;
+
+        if (quotation.terms_conditions && quotation.terms_conditions.trim() !== '[]') {
+            html += `
+           <hr>
+           <div>
+               <h3 class="textcolor">Terms and Conditions</h3>
+               <ul>
+                   ${quotation.terms_conditions
                     .split(',')
                     .filter(Boolean)
                     .map(term => `<li>${term.replace(/[\[\]{}"\\]/g, '').trim()}</li>`)
                     .join('')}
-            </ul>
-        </div>
-        `;
-        html  += `
+                </ul>
+           </div>
+    `;
+        }
+
+        html += `
+    ${showImageAndAddress === 'yes' ? `
+      <div style="height: 50px;"></div>
+      <div style="text-align: right; font-weight: bold;">
+          <p>for ${company.company_name}</p>
+      </div>
+    ` : ''} 
+  `;
+
+        html += `
+${showImageAndAddress === 'no' ? `
+<div style="height: 50px;"></div>
+  <div style="text-align: right; font-weight: bold;">
+      <p>This is a computer generate ${quotation.quotation_type} no signature requried</p>
+  </div>
+`: ''}
+`;
+
+
+        html += `
         </div>
         </body>
         </html>
         `;
-
-        // Create the PDF using Puppeteer
-   
-
         await page.setContent(html);
-        const pdfBuffer = await page.pdf({ format: 'A4' });
+
+        const pdfBuffer = await page.pdf({
+            format: 'A4',
+            margin: {
+                top: '10mm',
+                bottom: '30mm',
+            },
+        });
+
         fs.writeFileSync('test.pdf', pdfBuffer);
 
         response.setHeader('Content-Type', 'application/pdf');
@@ -607,11 +713,10 @@ const getQuotationpdf = async (request, response) => {
         await browser.close();
 
     } catch (error) {
-        console.error("Error generating PDF: Someting Missing");
-        response.status(500).json({ error: `Error generating PDF: Someting Missing` });
+        console.error('Error fetching quotations:', error);
+        response.status(500).json({ error: `Error generating PDF: Something Missing` });
     }
 };
-
 
 //modules...
 module.exports = {
@@ -622,7 +727,9 @@ module.exports = {
     getSalesPerson,
     getQuotation,
     getQuotationpdf,
-    getJobwork
+    getJobwork,
+    getSalespersonQuotations,
+    forgotPassword
 }
 
 

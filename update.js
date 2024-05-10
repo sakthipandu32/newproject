@@ -14,7 +14,7 @@ const updateCustomer = async (request, response) => {
     }
 }
 
-// Define your updateCompany function
+//updateCompany...
 const updateCompany = async (request, response) => {
     const company_id = parseInt(request.params.company_id);
     const { company_name, address1, address2, city, zip_code, company_email_id, company_phone_no, company_website, company_logo, bank_name, bank_branch, bank_ac_no, ifsc_number, company_gst_number } = request.body;
@@ -93,11 +93,11 @@ const updateQuotation = async (request, response) => {
     const quotationId = parseInt(request.params.quotationId);
     const client = await pool.connect();
     try {
-        await client.query('BEGIN'); 
+        await client.query('BEGIN');
 
         const updateQuotationQuery = `
-            UPDATE quotation SET customer_id = $1, company_id = $2, gst = $3, rate = $4, date = $5, terms_conditions = $6, salesperson_id = $7, prepared_by = $8, additional_text = $9,
-            additional_value = $10, less_text = $11, less_value = $12, est_caption = $13, totalamount = $14, quotation_type = $15 WHERE quotation_id = $16`;
+            UPDATE quotation SET customer_id = $1, company_id = $2, gst = $3, rate = $4, date = $5, terms_conditions = $6, salesperson_id = $7,  additional_text = $8,
+            additional_value = $9, less_text = $10, less_value = $11, est_caption = $12, totalamount = $13, quotation_type = $14, prepared_by = $15 WHERE quotation_id = $16`;
         const updateQuotationValues = [
             quotationData.customer_id,
             quotationData.company_id,
@@ -106,7 +106,6 @@ const updateQuotation = async (request, response) => {
             quotationData.date,
             JSON.stringify(quotationData.terms_conditions),
             quotationData.salesperson_id,
-            quotationData.prepared_by,
             quotationData.additional_text,
             quotationData.additional_value,
             quotationData.less_text,
@@ -114,22 +113,23 @@ const updateQuotation = async (request, response) => {
             quotationData.est_caption,
             quotationData.totalamount,
             quotationData.quotation_type,
+            quotationData.prepared_by,
             quotationId,
         ];
         await client.query(updateQuotationQuery, updateQuotationValues);
 
-            for (const jobwork of jobworkData) {
-                const { qj_id, q_id, job_id, jobwork_name, jobwork_description, productData } = jobwork;
-    
-                const updateJobworkQuery = `
+        for (const jobwork of jobworkData) {
+            const { qj_id, q_id, job_id, jobwork_name, jobwork_description, productData } = jobwork;
+
+            const updateJobworkQuery = `
                     UPDATE quotation_jobwork SET  jobwork_name = $1, jobwork_description = $2, q_id = $3, job_id = $4 WHERE qj_id = $5`;
-                const updateJobworkValues = [
-                    jobwork_name,  jobwork_description, q_id, job_id, qj_id 
-                ];
+            const updateJobworkValues = [
+                jobwork_name, jobwork_description, q_id, job_id, qj_id
+            ];
             await client.query(updateJobworkQuery, updateJobworkValues);
 
             for (const product of productData) {
-                const { qp_id, qj_id, prd_id,product_name, product_price, product_description, product_quantity, unit_type, amount, other_productname } = product;
+                const { qp_id, qj_id, prd_id, product_name, product_price, product_description, product_quantity, unit_type, amount, other_productname } = product;
 
                 const updateProductQuery = `
                     UPDATE quotation_product SET product_name = $1, product_price = $2, product_description = $3, product_quantity = $4, unit_type = $5, amount = $6, other_productname = $7, qj_id = $8, prd_id = $9 WHERE qp_id = $10 `;
@@ -139,18 +139,37 @@ const updateQuotation = async (request, response) => {
                 await client.query(updateProductQuery, updateProductValues);
             }
         }
-
         await client.query('COMMIT');
 
-        response.status(200).json({ message: 'Quotation and associated data updated successfully' });
+        response.status(200).json({ message: 'Quotation data updated successfully' });
     } catch (error) {
-        await client.query('ROLLBACK'); 
+        await client.query('ROLLBACK');
         response.status(500).json({ error: error.message });
         console.error("Error updating data: " + error.message);
     } finally {
         client.release();
     }
 };
+
+// updatepassword...
+const bcrypt = require('bcrypt');
+
+const updatepassword = async (request, response) => {
+    const { emailid, newpassword } = request.body;
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(newpassword, saltRounds);
+
+    try {
+        await pool.query(
+            'UPDATE "users" SET user_password = $1 WHERE email_id = $2',
+            [hashedPassword, emailid]
+        );
+        response.status(200).send({ message: 'Password updated successfully' });
+    } catch (err) {
+        response.status(500).send({ error: 'An error occurred while updating the password' });
+    }
+}
+
 
 //update modules...
 module.exports = {
@@ -160,7 +179,8 @@ module.exports = {
     updateUnit,
     updateTerms,
     updateCustomer,
-    updateQuotation
+    updateQuotation,
+    updatepassword
 }
 
 

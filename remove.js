@@ -5,7 +5,6 @@ const deleteCustomer = async (request, response) => {
   const user_id = parseInt(request.params.user_id);
   pool.query('DELETE FROM users WHERE user_id = $1', [user_id], (error) => {
     if (error) {
-      console.error('Error:', error);
       response.status(500).json({ error: 'Internal server error' });
     } else {
       response.status(200).send(`Company deleted with ID: ${user_id}`);
@@ -18,7 +17,6 @@ const deleteCompany = async (request, response) => {
   const company_id = parseInt(request.params.company_id);
   pool.query('DELETE FROM company WHERE company_id = $1', [company_id], (error) => {
     if (error) {
-      console.error('Error:', error);
       response.status(500).json({ error: 'Internal server error' });
     } else {
       response.status(200).send(`Company deleted with ID: ${company_id}`);
@@ -33,18 +31,11 @@ const deleteJobwork = async (req, res) => {
   const jobwork_id = parseInt(req.params.jobwork_id);
 
   try {
-    const result = await pool.query('DELETE FROM jobwork WHERE jobwork_id = $1', [jobwork_id]);
-
-    if (result.rowCount === 0) {
-      return res.status(404).send(`No jobwork found with ID: ${jobwork_id}`);
-    }
-
+    await pool.query('DELETE FROM jobwork WHERE jobwork_id = $1', [jobwork_id]);
     res.status(200).send(`Jobwork deleted with ID: ${jobwork_id}`);
   } catch (error) {
     if (error.code === '23503') {
-      return res
-        .status(200) 
-        .send(`Jobwork cannot be deleted because it is referenced by other records.`);
+      return res.status(200).send(`Jobwork cannot be deleted because it is referenced by other records.`);
     } else {
       return res.status(500).send(`An error occurred while trying to delete the jobwork: ${error.message}`);
     }
@@ -57,11 +48,9 @@ const deleteunit = async (request, response) => {
   const unit_id = parseInt(request.params.unit_id);
 
   try {
-    const result = await pool.query('DELETE FROM unit WHERE unit_id = $1', [unit_id]);
-    if (result.rowCount === 0) {
-      return response.status(404).send(`Unit not found with ID: ${unit_id}`);
-    }
-      response.status(200).send(`Unit deleted with ID: ${unit_id}`);
+    await pool.query('DELETE FROM unit WHERE unit_id = $1', [unit_id]);
+
+    response.status(200).send(`Unit deleted with ID: ${unit_id}`);
   } catch (error) {
     if (error.code === '23503') {
       return response.status(200).send(`Cannot delete unit because it is referenced by other records.`);

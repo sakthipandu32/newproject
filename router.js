@@ -11,9 +11,11 @@ router.post('/login', controller.login);
 router.post('/createuser', controller.createUser);
 router.get('/getcos', controller.getCustomer);
 router.get('/getsales', controller.getSalesPerson);
-router.get('/pdf/:quotationId?/:showImageAndAddress', controller.getQuotationpdf);
+router.get('/pdf/:quotationId/:showImageAndAddress', controller.getQuotationpdf);
 router.get('/quotation', controller.getQuotation);
 router.get('/getjob/:jobworkName', controller.getJobwork);
+router.get('/quotations/:salespersonId', controller.getSalespersonQuotations);
+router.post('/forgotpassword', controller.forgotPassword);
 
 //create...
 router.post('/company', create.createCompany);
@@ -31,6 +33,8 @@ router.put('/updatepro/:product_id', update.updateProduct);
 router.put('/updateunit/:unit_id', update.updateUnit);
 router.put('/updatetc/:tc_id', update.updateTerms);
 router.put('/updatequotation/:quotationId', update.updateQuotation);
+router.put('/updatepassword', update.updatepassword);
+
 
 //delete...
 router.delete('/deletecom/:company_id', remove.deleteCompany);
