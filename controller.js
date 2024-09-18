@@ -21,47 +21,47 @@ const createUser = async (request, response) => {
 
         if (!tableExistsResult.rows[0].exists) {
             const createtableQuery = `
-          CREATE TABLE IF NOT EXISTS "users" ( user_id SERIAL PRIMARY KEY, first_name VARCHAR(250)  NULL,  last_name VARCHAR(250) NULL,  user_password VARCHAR(250),  email_id VARCHAR(250) NULL,
-                                           phone_no BIGINT  NULL, alter_no VARCHAR(250) NOT NULL, website VARCHAR(250), address1 VARCHAR(250),  address2 VARCHAR(250), city VARCHAR(250),
+          CREATE TABLE IF NOT EXISTS "users" ( user_id SERIAL PRIMARY KEY, first_name VARCHAR(250)  NOT NULL,  last_name VARCHAR(250) NOT NULL,  user_password VARCHAR(250),  email_id VARCHAR(250) NOT NULL,
+                                           phone_no BIGINT  NOT NULL, alter_no VARCHAR(250), website VARCHAR(250), address1 VARCHAR(250),  address2 VARCHAR(250), city VARCHAR(250),
                                            zip_code BIGINT,  bank_name VARCHAR(250), bank_branch VARCHAR(250), bank_ac_no VARCHAR(250), 
                                            ifsc_number VARCHAR(250), customer_gst_number VARCHAR(250), user_role VARCHAR(250) NOT NULL)`;
             await pool.query(createtableQuery);
 
         } if (!tableExistsResult.rows[0].exists) {
             const companyTableQuery =
-                `CREATE TABLE IF NOT EXISTS company (company_id SERIAL PRIMARY KEY, company_name VARCHAR(250)  NULL, company_email_id VARCHAR(250)  NULL, company_phone_no BIGINT  NULL, company_website VARCHAR(250)  NULL, 
+                `CREATE TABLE IF NOT EXISTS company (company_id SERIAL PRIMARY KEY, company_name VARCHAR(250)  NOT NULL, company_email_id VARCHAR(250)  NOT NULL, company_phone_no BIGINT  NOT NULL, company_website VARCHAR(250)  , 
            company_logo bytea, address1 VARCHAR(250),  address2 VARCHAR(250), city VARCHAR(250),  zip_code BIGINT,  bank_name VARCHAR(250), bank_branch VARCHAR(250), bank_ac_no VARCHAR(250), 
            ifsc_number VARCHAR(250),  company_gst_number VARCHAR(250))`;
             await pool.query(companyTableQuery);
         } if (!tableExistsResult.rows[0].exists) {
             const jobworkTableQuery =
-                ` CREATE TABLE IF NOT EXISTS jobwork ( jobwork_id SERIAL PRIMARY KEY, jobwork_name VARCHAR(250) NULL, jobwork_description VARCHAR(250) NULL)`;
+                ` CREATE TABLE IF NOT EXISTS jobwork ( jobwork_id SERIAL PRIMARY KEY, jobwork_name VARCHAR(250) NOT NULL, jobwork_description VARCHAR(250))`;
             await pool.query(jobworkTableQuery);
             if (!tableExistsResult.rows[0].exists) {
                 const unitTableQuery =
-                    ` CREATE TABLE IF NOT EXISTS unit ( unit_id SERIAL PRIMARY KEY, unit_type VARCHAR(250)  NULL , unit_text VARCHAR(250))`;
+                    ` CREATE TABLE IF NOT EXISTS unit ( unit_id SERIAL PRIMARY KEY, unit_type VARCHAR(250) NOT NULL , unit_text VARCHAR(250) NOT NULL)`;
                 await pool.query(unitTableQuery);
             }
         } if (!tableExistsResult.rows[0].exists) {
             const productTableQuery =
-                ` CREATE TABLE IF NOT EXISTS product ( product_id SERIAL PRIMARY KEY, product_image bytea, product_name VARCHAR(250) NULL, product_price VARCHAR(250)  NULL, product_description VARCHAR(250)  NULL, 
-                                                      product_wholesale_price VARCHAR(250), j_id INT REFERENCES jobwork(jobwork_id), u_id INT REFERENCES unit(unit_id))`;
+                ` CREATE TABLE IF NOT EXISTS product ( product_id SERIAL PRIMARY KEY, product_image bytea, product_name VARCHAR(250) NOT NULL, product_price VARCHAR(250)  NOT NULL, product_description VARCHAR(250), 
+                                                      product_wholesale_price VARCHAR(250) NOT NULL, j_id INT REFERENCES jobwork(jobwork_id), u_id INT REFERENCES unit(unit_id))`;
             await pool.query(productTableQuery);
         } if (!tableExistsResult.rows[0].exists) {
             const termsTableQuery =
-                ` CREATE TABLE IF NOT EXISTS  terms_condition ( tc_id SERIAL PRIMARY KEY, terms_conditions_name  VARCHAR(300)  NULL, tc_value VARCHAR(1000) )`;
+                ` CREATE TABLE IF NOT EXISTS  terms_condition ( tc_id SERIAL PRIMARY KEY, terms_conditions_name  VARCHAR(300)  NOT NULL, tc_value VARCHAR(1000) NOT NULL )`;
             await pool.query(termsTableQuery);
 
         } if (!tableExistsResult.rows[0].exists) {
             const qoutationTableQuery =
                 `CREATE TABLE IF NOT EXISTS quotation (
                 quotation_id SERIAL PRIMARY KEY,
-                quotation_type VARCHAR(250),
-                customer_id INT, company_id INT,
-                est_caption VARCHAR(250),
+                quotation_type VARCHAR(250) NOT NULL,
+                customer_id INT NOT NULL, company_id INT NOT NULL,
+                est_caption VARCHAR(250) NOT NULL,
                 gst VARCHAR(250), rate VARCHAR(250), date DATE,  
-                terms_conditions VARCHAR(250), document_no VARCHAR(250), salesperson_id INT, 
-                prepared_by INT, additional_text VARCHAR(250),  additional_value VARCHAR(250), less_text VARCHAR(250), less_value VARCHAR(250), totalamount VARCHAR(250), gst_amount VARCHAR(250), less_amount VARCHAR(250), lessvalue_amount VARCHAR(250))`;
+                terms_conditions VARCHAR(250), document_no VARCHAR(250), salesperson_id INT NOT NULL, 
+                prepared_by INT, additional_text VARCHAR(250),  additional_value VARCHAR(250), less_text VARCHAR(250), less_value VARCHAR(250), totalamount VARCHAR(250), gst_amount VARCHAR(250), less_amount VARCHAR(250), lessvalue_amount VARCHAR(250), amount_wo_gst VARCHAR(250), show_header VARCHAR(250))`;
             await pool.query(qoutationTableQuery);
         } if (!tableExistsResult.rows[0].exists) {
             const QJTableQuery =
@@ -78,14 +78,21 @@ const createUser = async (request, response) => {
             await pool.query(JPTableQuery);
         }
 
-        const hashedPassword = await bcrypt.hash(user_password, 10);
         const userCheckQuery = 'SELECT * FROM "users" WHERE email_id = $1';
         const userCheckResult = await pool.query(userCheckQuery, [email_id]);
         if (userCheckResult.rows.length > 0) {
             return response.status(400).json({ error: 'Email already exists' });
         }
-        await pool.query('INSERT INTO "users" (first_name, last_name, user_password, email_id, phone_no, alter_no, website, address1, address2, city, zip_code, user_role, bank_name, bank_branch, bank_ac_no, ifsc_number, customer_gst_number) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)',
-            [first_name, last_name, hashedPassword, email_id, phone_no, alter_no, website, address1, address2, city, zip_code, user_role, bank_name, bank_branch, bank_ac_no, ifsc_number, customer_gst_number]);
+
+        let hashedPassword = null;
+        if (user_password) {
+            hashedPassword = await bcrypt.hash(user_password, 10);
+        }
+        const insertUserQuery = `
+            INSERT INTO "users" (first_name, last_name, user_password, email_id, phone_no, alter_no, website, address1, address2, city, zip_code, user_role, bank_name, bank_branch, bank_ac_no, ifsc_number, customer_gst_number)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`;
+        const userValues = [first_name, last_name, hashedPassword, email_id, phone_no, alter_no, website, address1, address2, city, zip_code, user_role, bank_name, bank_branch, bank_ac_no, ifsc_number, customer_gst_number];
+        await pool.query(insertUserQuery, userValues);
         response.status(201).json({ message: 'User created successfully', password: user_password });
 
     } catch (error) {
@@ -93,10 +100,12 @@ const createUser = async (request, response) => {
         response.status(500).json({ error: 'Internal server error' });
     }
 };
+  
 
 //login...
 const login = async (req, res) => {
     const { email_id, password } = req.body;
+
     try {
         const userResult = await pool.query('SELECT * FROM "users" WHERE email_id = $1', [email_id]);
 
@@ -106,20 +115,20 @@ const login = async (req, res) => {
 
             if (passwordMatch) {
                 const userRole = userResult.rows[0].user_role;
+                const userId = userResult.rows[0].user_id;
+                const firstletter = userResult.rows[0].first_name.charAt(0);
+                const lastletter = userResult.rows[0].last_name.charAt(0);
+                const initial = { firstletter, lastletter };
 
                 if (userRole === 'admin') {
                     const responseData = ['user', 'company', 'jobwork', 'terms&condition', 'product', 'unit', 'quotation'];
-                    const salespersonId = userResult.rows[0].user_id;
-                    const userRole = userResult.rows[0].user_role;
-                    res.json({ success: true, message: 'Login successful', data: responseData, user_id: salespersonId, userRole });
+                    res.json({ success: true, message: 'Login successful', data: responseData, user_id: userId, userRole, initial });
                 } else if (userRole === 'salesperson') {
                     const responseData = ['user', 'quotation'];
-                    const salespersonId = userResult.rows[0].user_id;
-                    const userRole = userResult.rows[0].user_role;
-                    res.json({ success: true, message: 'Login successful', data: responseData, user_id: salespersonId, userRole });
+                    res.json({ success: true, message: 'Login successful', data: responseData, user_id: userId, userRole, initial });
                 } else if (userRole === 'staff') {
-                    const responseData = ['jobwork', 'terms&condition', 'product', 'unit', 'quotation'];
-                    res.json({ success: true, message: 'Login successful', data: responseData });
+                    const responseData = ['user', 'jobwork', 'terms&condition', 'product', 'unit', 'quotation'];
+                    res.json({ success: true, message: 'Login successful', data: responseData, user_id: userId, userRole, initial });
                 } else {
                     res.status(401).json({ success: false, message: 'Invalid user role' });
                 }
@@ -139,14 +148,6 @@ const login = async (req, res) => {
 const nodemailer = require('nodemailer');
 const generator = require('generate-password');
 
-const transporter = nodemailer.createTransport({
-    service: 'Gmail',
-    auth: {
-        user: 'sakthi032vel@gmail.com',
-        pass: 'ttjzpkoyqhgdzond',
-    }
-});
-
 const forgotPassword = async (req, res) => {
     const { email_id } = req.body;
 
@@ -165,24 +166,53 @@ const forgotPassword = async (req, res) => {
             [hashedPassword, email_id]
         );
 
-        await transporter.sendMail({
-            from: 'sakthi032vel@gmail.com',
+        const transporter = nodemailer.createTransport({
+            host: "mail.gsmetalcraft.in",
+            port: 587,
+            secure: false,
+            auth: {
+                user: 'admin@gsmetalcraft.in',
+                pass: '0bioV@z^}V}R',
+            },
+            tls: {
+                rejectUnauthorized: false
+            }
+        });
+        
+        const mailOptions = {
+            from:'admin@gsmetalcraft.in',
             to: email_id,
             subject: 'Password Reset',
             html: `
-                <div style="font-family: Arial, sans-serif; padding: 20px;">
-                    <h1 style="color: #4A90E2;">Password Reset Instructions</h1>
-                    <p style="font-size: 16px; color: #333;">
-                        Your new password is: <strong style="font-size: 20px;">${newPassword}</strong>. Please change your password after logging in.
-                    </p>
-                </div>
+                 <div style=" font-family: Arial, Helvetica, sans-serif;  padding: 20px;  text-align: center;  background-color: #EEEEF5;  border: 1px solid #CCCCCC;  border-radius: 10px; max-width: 650px;  margin: 0 auto;">
+                 <h1 style="color: #213785; margin: 0;">Password Reset</h1>
+                 <p style="font-size: 16px; color: #333; margin: 10px 0;">
+                     Your new password is: 
+                 </p>
+                 <div style="font-size: 20px; color: #2196F3; background-color: #FFFFFF; border: 1px solid #CCCCCC; border-radius: 5px; padding: 10px; display: inline-block;">
+                     ${newPassword}
+                      </div>
+                 <p style="font-size: 16px; color: #333; margin: 10px 0;">
+                     Please change your password after logging in.
+                 </p>
+             </div>
             `,
+        };
+        
+        transporter.sendMail(mailOptions, (error, info) => {
+            if (error) {
+                console.error('Error during forgot-password:', error);
+                res.status(500).json({ success: false, message: error });
+            } else {
+                console.log('Password reset email sent:', info.response);
+                res.json({ success: true, message: 'Password reset email sent' });
+            }
         });
-        res.json({ success: true, message: 'Password reset email sent' });
+        
 
     } catch (error) {
         console.error('Error during forgot-password:', error);
-        res.status(500).json({ success: false, message: 'Internal server error' });
+        res.status(500).json({ success: false, message: error });
     }
 };
 
@@ -190,13 +220,13 @@ const forgotPassword = async (req, res) => {
 //getdata...
 const getData = async (request, response) => {
     const TableName = request.params.TableName;
-    const orderBy = request.query.orderBy || TableName;
-    const orderDirection = request.query.orderDirection || 'ASC';
+    const orderBy = request.query.orderBy || TableName; 
+    const orderDirection = request.query.orderDirection || 'ASC'; 
 
     try {
         const query = `SELECT * FROM ${TableName} ORDER BY ${orderBy} ${orderDirection}`;
         const { rows } = await pool.query(query);
-
+  
         if (rows.length > 0) {
             const data = rows.map(row => {
                 if (row.tc_value) {
@@ -204,16 +234,17 @@ const getData = async (request, response) => {
                     const tc_value = term.replace(/[\[\]{}"\\]/g, ' ').trim();
                     row.tc_value = tc_value;
                 }
-
-                if (row.product_image) {
-                    const base64 = row.product_image;
-                    const src = "" + base64;
-                    row.editImage = src;
-                }
-                if (row.company_logo) {
+                
+                if (TableName === 'company' && row.company_logo) {
                     const base64 = row.company_logo;
                     const src = "" + base64;
                     row.editImage = src;
+                }
+
+                if (TableName === 'product' && row.product_image) {
+                    const base64 = row.product_image;
+                    const src = "" + base64;
+                    row.editImage = src; 
                 }
                 return row;
             });
@@ -221,12 +252,15 @@ const getData = async (request, response) => {
         } else {
             return response.status(200).json({ error: 'No data found' });
         }
-
+  
     } catch (error) {
         console.error('Error:', error.message);
         response.status(500).json({ error: 'Failed to get data' });
     }
 };
+
+
+
 
 //getcustomer...
 const getCustomer = async (request, response) => {
@@ -255,22 +289,56 @@ const getSalesPerson = async (request, response) => {
 
 //getquotation...
 const getQuotation = async (request, response) => {
+    const orderBy = request.query.orderBy || 'quotation';
+    const orderDirection = request.query.orderDirection || 'DESC';
     try {
         const quotationQuery = `
-        SELECT * FROM quotation`;
+        SELECT * FROM quotation ORDER BY ${orderBy} ${orderDirection}`;
         const quotationResult = await pool.query(quotationQuery);
         const quotations = quotationResult.rows;
 
         for (const quotation of quotations) {
+            const customerQuery = `SELECT first_name, last_name FROM users WHERE user_id = $1`;
+            const customerValues = [quotation.customer_id];
+            const customerResult = await pool.query(customerQuery, customerValues);
+            const customer = customerResult.rows[0];
+
+            const salesQuery = `SELECT first_name, last_name FROM users WHERE user_id = $1`;
+            const salesValues = [quotation.salesperson_id];
+            const salesResult = await pool.query(salesQuery, salesValues);
+            const sales = salesResult.rows[0];
+
+            const preparedQuery = `SELECT first_name, last_name FROM users WHERE user_id = $1`;
+            const preparedValues = [quotation.prepared_by];
+            const preparedResult = await pool.query(preparedQuery, preparedValues);
+            const prepared = preparedResult.rows[0];
+
+            const companyQuery = `
+            SELECT company_name FROM company WHERE company_id = $1`;
+            const companyValues = [quotation.company_id];
+            const companyResult = await pool.query(companyQuery, companyValues);
+            const company = companyResult.rows[0];
+
+            quotation.customer_name = customer ? `${customer.first_name} ${customer.last_name}` : '';
+            quotation.salesperson_name = sales ? `${sales.first_name} ${sales.last_name}` : '';
+            quotation.preparedby_name = prepared ? `${prepared.first_name} ${prepared.last_name}` : '';
+            quotation.company_name = company ? company.company_name : 'Unknown Company';
+           
+            const date = new Date(quotation.date);
+            const formattedDate = `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
+            quotation.quotation_date = formattedDate;
+            
+    
+
             const jobworkQuery = `
-          SELECT * FROM quotation_jobwork WHERE q_id = $1`;
+            SELECT * FROM quotation_jobwork WHERE q_id = $1`;
             const jobworkValues = [quotation.quotation_id];
             const jobworkResult = await pool.query(jobworkQuery, jobworkValues);
             const jobworks = jobworkResult.rows;
 
             for (const jobwork of jobworks) {
                 const productQuery = `
-            SELECT * FROM quotation_product WHERE qj_id = $1`;
+                SELECT * FROM quotation_product WHERE qj_id = $1`;
                 const productValues = [jobwork.qj_id];
                 const productResult = await pool.query(productQuery, productValues);
 
@@ -292,7 +360,7 @@ const getSalespersonQuotations = async (request, response) => {
     try {
         const quotationQuery = `
         SELECT * FROM quotation WHERE salesperson_id = $1`;
-        const quotationResult = await pool.query(quotationQuery, [salespersonId]);
+        const quotationResult = await pool.query(quotationQuery,[salespersonId]);
 
         if (quotationResult.rowCount === 0) {
             return response.status(200).json({ error: 'No quotations found' });
@@ -300,6 +368,36 @@ const getSalespersonQuotations = async (request, response) => {
         const quotations = quotationResult.rows;
 
         for (const quotation of quotations) {
+                 const customerQuery = `SELECT first_name, last_name FROM users WHERE user_id = $1`;
+            const customerValues = [quotation.customer_id];
+            const customerResult = await pool.query(customerQuery, customerValues);
+            const customer = customerResult.rows[0];
+
+            const salesQuery = `SELECT first_name, last_name FROM users WHERE user_id = $1`;
+            const salesValues = [quotation.salesperson_id];
+            const salesResult = await pool.query(salesQuery, salesValues);
+            const sales = salesResult.rows[0];
+
+            const preparedQuery = `SELECT first_name, last_name FROM users WHERE user_id = $1`;
+            const preparedValues = [quotation.prepared_by];
+            const preparedResult = await pool.query(preparedQuery, preparedValues);
+            const prepared = preparedResult.rows[0];
+
+            const companyQuery = `
+            SELECT company_name FROM company WHERE company_id = $1`;
+            const companyValues = [quotation.company_id];
+            const companyResult = await pool.query(companyQuery, companyValues);
+            const company = companyResult.rows[0];
+
+            quotation.customer_name = customer ? `${customer.first_name} ${customer.last_name}` : 'Unknown Customer';
+            quotation.salesperson_name = sales ? `${sales.first_name} ${sales.last_name}` : 'Unknown Salesperson';
+            quotation.preparedby_name = prepared ? `${prepared.first_name} ${prepared.last_name}` : 'Unknown Preparer';
+            quotation.company_name = company ? company.company_name : 'Unknown Company';
+
+            const date = new Date(quotation.date);
+            const formattedDate = `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
+            quotation.quotation_date = formattedDate;
+            
             const jobworkQuery = `
           SELECT * FROM quotation_jobwork WHERE q_id = $1`;
             const jobworkValues = [quotation.quotation_id];
@@ -316,7 +414,7 @@ const getSalespersonQuotations = async (request, response) => {
             }
             quotation.jobworkData = jobworks;
         }
-        response.status(200).json({ quotations });
+        response.status(200).json({ quotations});
     } catch (error) {
         response.status(500).json({ error: 'Internal server error' });
         console.error('Error fetching quotations:', error);
@@ -366,18 +464,12 @@ const getJobwork = async (request, response) => {
 
 //quotation pdf...
 const puppeteer = require('puppeteer');
+const { decrypt } = require('dotenv');
 
 const getQuotationpdf = async (request, response) => {
-    let { quotationId, showImageAndAddress } = request.params;
+    let { quotationId} = request.params;
 
     try {
-        if (showImageAndAddress !== 'yes' && showImageAndAddress !== 'no') {
-            return response.status(400).json({ error: 'Invalid value for showImageAndAddress' });
-        }
-        // if (Signature !== 'yes' && Signature !== 'no') {
-        //     return response.status(400).json({ error: 'Invalid value for Signature' });
-        // }
-
         const quotationQuery = `SELECT * FROM quotation WHERE quotation_id = $1`;
         const quotationResult = await pool.query(quotationQuery, [quotationId]);
 
@@ -397,6 +489,11 @@ const getQuotationpdf = async (request, response) => {
         const salesResult = await pool.query(salesQuery, salesValues);
         const sales = salesResult.rows[0];
 
+        const PreparedQuery = `SELECT first_name, last_name FROM users WHERE user_id = $1`;
+        const PreparedValues = [quotation.prepared_by];
+        const PreparedResult = await pool.query(PreparedQuery, PreparedValues);
+        const Prepared = PreparedResult.rows[0];
+
         const companyQuery = `
         SELECT company_name, company_logo, address1, company_phone_no FROM company WHERE company_id = $1 `;
         const companyValues = [quotation.company_id];
@@ -413,26 +510,22 @@ const getQuotationpdf = async (request, response) => {
 
         const bootstrapCSS = `<link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">`;
 
-        const browser = await puppeteer.launch();
-        const page = await browser.newPage();
         let html = `
         <!DOCTYPE html>
         <html>
         <head>
-            <title>Quotation Details</title>
+            <title>${quotation.quotation_type}</title>
             ${bootstrapCSS}
             <style>
                 body {
                     font-family: Arial, sans-serif;
                     text-transform: capitalize;
                     margin: 0;
-                    padding: 60px;
                     font-size: 20px;
                     page-break-before: always;
                 }
                 .quotation-header {
                     text-align: center;
-                    
                 }
                 .est-caption {
                     text-align: center;
@@ -443,20 +536,23 @@ const getQuotationpdf = async (request, response) => {
                     justify-content: space-between;
                     align-items: flex-start;
                     margin-top: 30px;
+                  
                 }
                 .customer-info {
                     font-size: 20px;
                     line-height: 1.5;
-                    background-color: #E8E8E8;
+                    background-color: #EEEEF5;
                     width: 470px;
-                    border-radius: 8px;
+                    border: 1px solid #CCCCCC;
+                    border-radius: 10px;
                 }
                 .right-info {
                     font-size: 20px;
                     line-height: 1.5;
-                    background-color: #E8E8E8;
+                    background-color: #EEEEF5;
                     width: 470px;
-                    border-radius: 8px;
+                    border: 1px solid #CCCCCC;
+                    border-radius: 10px;
                 }
                 .company-address {
                     text-align: right;
@@ -468,6 +564,7 @@ const getQuotationpdf = async (request, response) => {
                 .total-amount {
                     color: #111C43;
                     font-weight: bold;
+                    font-size:24px;
                 }
                 .table th,
                 .table td {
@@ -520,7 +617,7 @@ const getQuotationpdf = async (request, response) => {
         </head>
         <body>
             <div class="container">
-                ${showImageAndAddress === 'yes' ? `
+                ${quotation.show_header === 'true'? `
                 <div style="display: flex; align-items: center; justify-content: space-between; font-size: 20px;">
                     <div>
                         <img src="${company.company_logo}" alt="Company Logo" class="company-logo"> 
@@ -537,14 +634,15 @@ const getQuotationpdf = async (request, response) => {
             <div class="quotation-header"><h2  class="textcolor">${quotation.quotation_type}</h2></div>
         <div class="details">
         <div class="customer-info pl-4 pt-4 pb-4">
-            <h3 class = "pb-2  textcolor">Customer Info</h3>
-            <p><label>To.</label> ${customer.first_name} ${customer.last_name}<br>
+            <h3 class = "pb-4  textcolor">Customer Info</h3>
+            <p> ${customer.first_name} ${customer.last_name}<br>
            ${customer.city}</p>
         </div>
-        <div class="right-info pl-4 pt-4 pb-4">
+        <div class="right-info pl-4 pt-4 ">
             <p><label>Date:</label> ${formattedQuotationDate}<br>
              <label>Document No:</label> ${quotation.document_no}<br>
-             <label>Salesperson:</label> ${sales.first_name} ${sales.last_name}</p>
+             <label>Salesperson:</label> ${sales.first_name} ${sales.last_name}<br>
+             <label>Prepared By:</label> ${Prepared.first_name} ${Prepared.last_name}</p>
         </div>
     </div>
     `
@@ -613,11 +711,22 @@ const getQuotationpdf = async (request, response) => {
       `;
 
         html += `
-<hr>
-    <h3 style="font-size=1px" class="textcolor">Amount Details</h3>
+<hr style="border-top: 1px solid #000;">
+<div style="display: flex; justify-content: space-between;width: 90%; color: #111C43; font-weight: bold;">
+    <p style="font-size:25px; padding-left: 450px;">Sub Total</p> 
+    <p style="font-size:24px;">₹${quotation.amount_wo_gst}</p>
+</div>
+<hr style="border-top: 1px solid #000; margin-top: 0px;">
+
     <div class="amount">
     <table class="table" style="width: 85%; border-collapse: collapse; border: none;">
-        ${quotation.gst ? `
+    ${quotation.amount_wo_gst ?`
+    <tr>
+    <td>Gross</td>
+            <td style="text-align: right;">₹${quotation.amount_wo_gst}</td>
+</tr>
+    `:''}
+        ${quotation.gst ?`
         <tr>
         <td>GST</td>
         <td>
@@ -656,39 +765,48 @@ const getQuotationpdf = async (request, response) => {
 </div>
 `;
 
-        if (quotation.terms_conditions && quotation.terms_conditions.trim() !== '[]') {
-            html += `
-           <hr>
-           <div>
-               <h3 class="textcolor">Terms and Conditions</h3>
-               <ul>
-                   ${quotation.terms_conditions
-                    .split(',')
-                    .filter(Boolean)
-                    .map(term => `<li>${term.replace(/[\[\]{}"\\]/g, '').trim()}</li>`)
-                    .join('')}
-                </ul>
-           </div>
-    `;
-        }
+    
+if (quotation.terms_conditions && quotation.terms_conditions.trim() !== '[]') {
+    html += `<hr><div><h3 class="textcolor">Terms and Conditions</h3><ul>`;
 
-        html += `
-    ${showImageAndAddress === 'yes' ? `
-      <div style="height: 50px;"></div>
+    const ids = quotation.terms_conditions
+        .split(',')
+        .filter(Boolean)
+        .map(tc_id => tc_id.replace(/[\[\]{}"\\]/g, '').trim()); 
+
+  
+    for (const tc_id of ids) {
+        const term = await pool.query(`SELECT tc_value FROM terms_condition WHERE tc_id = ${tc_id}`);
+        if (term && term.rows.length > 0) {
+            const tcValues = term.rows
+            .map(row => row.tc_value)
+            .filter(Boolean)
+            .map(tc_value => tc_value.replace(/[\[\]{}"\\]/g, '').trim());
+            html += `<li style="width: 600px;">${tcValues.join('</li><li>')}</li>`;
+        }
+    }
+}
+
+     
+    html += `
+    ${quotation.show_header === 'true'? `
+    <div style="height: 30px;"></div>
       <div style="text-align: right; font-weight: bold;">
           <p>for ${company.company_name}</p>
-      </div>
+      </div>    
     ` : ''} 
   `;
 
-        html += `
-${showImageAndAddress === 'no' ? `
-<div style="height: 50px;"></div>
-  <div style="text-align: right; font-weight: bold;">
-      <p>This is a computer generate ${quotation.quotation_type} no signature requried</p>
-  </div>
-`: ''}
-`;
+  html += `
+  ${quotation.show_header === null || quotation.show_header === '' || quotation.show_header === 'false'?
+    `
+    <div style="height: 30px;"></div>
+    <div style="text-align: right; font-weight: bold;">
+      <p>This is a computer generated ${quotation.quotation_type} no signature required</p>
+    </div>
+    ` 
+  : ''}`;
+  
 
 
         html += `
@@ -696,27 +814,31 @@ ${showImageAndAddress === 'no' ? `
         </body>
         </html>
         `;
-        await page.setContent(html);
+        const browser = await puppeteer.launch({
+            args: ['--no-sandbox', '--disable-setuid-sandbox'],
+        });
+        const page = await browser.newPage();
 
+        await page.setContent(html);
         const pdfBuffer = await page.pdf({
             format: 'A4',
             margin: {
-                top: '10mm',
-                bottom: '30mm',
+                top: '17mm',
+                bottom: '10mm',
             },
         });
 
         fs.writeFileSync('test.pdf', pdfBuffer);
 
-        response.setHeader('Content-Type', 'application/pdf');
+       response.setHeader('Content-Type', 'application/pdf');
+        // response.setHeader('Content-Disposition', `attachment; filename="${quotation.document_no}.pdf"`);
         response.send(pdfBuffer);
-        await browser.close();
-
     } catch (error) {
-        console.error('Error fetching quotations:', error);
-        response.status(500).json({ error: `Error generating PDF: Something Missing` });
+        console.error('Error generating PDF:', error);
+        response.status(500).send('Error generating PDF');
     }
 };
+
 
 //modules...
 module.exports = {
@@ -731,5 +853,3 @@ module.exports = {
     getSalespersonQuotations,
     forgotPassword
 }
-
-

@@ -4,6 +4,9 @@ const pool = require('./db');
 const createCompany = async (request, response) => {
     const { company_name, address1, address2, city, zip_code, company_email_id, company_phone_no, company_website, company_logo, bank_name, bank_branch, bank_ac_no, ifsc_number, company_gst_number } = request.body;
     try {
+        if (!company_name || !company_email_id || !company_phone_no) {
+            return response.status(200).json({ error: 'Missing required fields' });
+        }
         const companyCheckQuery = 'SELECT * FROM company WHERE company_name = $1';
         const companyCheckResult = await pool.query(companyCheckQuery, [company_name]);
         if (companyCheckResult.rows.length > 0) {
@@ -22,8 +25,8 @@ const createCompany = async (request, response) => {
 //createjobwork...
 const createJob = async (request, response) => {
     const { jobwork_name, jobwork_description } = request.body;
-    if (!jobwork_name || !jobwork_description) {
-        return response.status(400).json({ error: 'Missing required fields' });
+    if (!jobwork_name) {
+        return response.status(200).json({ error: 'Missing required fields' });
     }
     try {
         const jobCheckQuery = 'SELECT * FROM jobwork WHERE jobwork_name = $1';
@@ -36,7 +39,7 @@ const createJob = async (request, response) => {
         response.status(201).json({ message: 'Jobwork created successfully' });
     } catch (error) {
         console.error('Error:', error);
-        response.status(500).json({ error: 'Internal server error' });
+        response.status(200).json({ error: 'Internal server error' });
     }
 };
 
@@ -44,7 +47,7 @@ const createJob = async (request, response) => {
 const TermsConditions = async (request, response) => {
     const { terms_conditions_name, tc_value } = request.body;
     if (!terms_conditions_name || !tc_value) {
-        return response.status(400).json({ error: 'Missing required fields' });
+        return response.status(200).json({ error: 'Missing required fields' });
     }
     try {
         await pool.query('INSERT INTO terms_condition (terms_conditions_name, tc_value) VALUES ($1, $2)',
@@ -52,7 +55,7 @@ const TermsConditions = async (request, response) => {
         response.status(201).json({ message: 'TermsConditions created successfully' });
     } catch (error) {
         console.error('Error:', error);
-        response.status(500).json({ error: 'Internal server error' });
+        response.status(200).json({ error: 'Internal server error' });
     }
 }
 
@@ -60,7 +63,7 @@ const TermsConditions = async (request, response) => {
 const createUnit = async (request, response) => {
     const { unit_type, unit_text } = request.body;
     if (!unit_type || !unit_text) {
-        return response.status(400).json({ error: 'Missing required fields' });
+        return response.status(200).json({ error: 'Missing required fields' });
     }
     try {
         const unitCheckQuery = 'SELECT * FROM unit WHERE unit_type = $1';
@@ -73,7 +76,7 @@ const createUnit = async (request, response) => {
         response.status(201).json({ message: 'unit created successfully' });
     } catch (error) {
         console.error('Error:', error);
-        return response.status(500).json({ error: 'Internal server error' });
+        return response.status(200).json({ error: 'Internal server error' });
     }
 }
 
@@ -81,8 +84,8 @@ const createUnit = async (request, response) => {
 const createProduct = async (request, response) => {
     const { product_image, product_name, product_price, product_description, product_wholesale_price, j_id, u_id } = request.body;
 
-    if (!product_name || !product_price || !product_description || !product_wholesale_price || !j_id || !u_id) {
-        return response.status(400).json({ error: 'Missing required fields' });
+    if (!product_name || !product_price || !product_description || !product_wholesale_price) {
+        return response.status(200).json({ error: 'Missing required fields' });
     }
     try {
         await pool.query('INSERT INTO product (product_image, product_name, product_price, product_description, product_wholesale_price, j_id, u_id) VALUES ($1, $2, $3, $4, $5, $6, $7)',
@@ -99,19 +102,21 @@ const insertQuotation = async (request, response) => {
     const { quotationData, jobworkData } = request.body;
     try {
         const currentDate = new Date();
-        const formattedDate = currentDate.toISOString().slice(0, 10).replace(/-/g, '');
+        const year = currentDate.getFullYear().toString().slice(-2); 
+        const month = ('0' + (currentDate.getMonth() + 1)).slice(-2);
+        const formattedDate = `${year}${month}`; 
 
         const QuotationType = quotationData.quotation_type === 'Estimates' ? 'EST' : 'QUO';
 
-        const lastQuotationQuery = `SELECT MAX(SUBSTRING(document_no, 11)::int) AS last_document_no FROM quotation WHERE document_no LIKE '${QuotationType}${formattedDate}%'`;
+        const lastQuotationQuery = `SELECT MAX(SUBSTRING(document_no, 9)::int) AS last_document_no FROM quotation WHERE document_no LIKE '${QuotationType}${formattedDate}%'`;
         const lastQuotationResult = await pool.query(lastQuotationQuery);
         const lastDocumentNo = lastQuotationResult.rows[0].last_document_no || 0;
 
-        const documentNo = `${QuotationType}${formattedDate}${('000' + (lastDocumentNo + 1)).slice(-4)}`;
+        const documentNo = `${QuotationType}${formattedDate}${('0' + (lastDocumentNo + 1))}`;
 
         const quotationQuery = `
-        INSERT INTO quotation (customer_id, company_id, gst, rate, date, terms_conditions, document_no, salesperson_id, prepared_by, additional_text, additional_value, less_text, less_value, est_caption, totalamount, quotation_type, gst_amount, less_amount, lessvalue_amount)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+        INSERT INTO quotation (customer_id, company_id, gst, rate, date, terms_conditions, document_no, salesperson_id, prepared_by, additional_text, additional_value, less_text, less_value, est_caption, totalamount, quotation_type, gst_amount, less_amount, lessvalue_amount, amount_wo_gst, show_header)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
         RETURNING quotation_id`;
         const quotationValues = [
             quotationData.customer_id,
@@ -132,7 +137,9 @@ const insertQuotation = async (request, response) => {
             quotationData.quotation_type,
             quotationData.gst_amount,
             quotationData.less_amount,
-            quotationData.lessvalue_amount
+            quotationData.lessvalue_amount,
+            quotationData.amount_wo_gst,
+            quotationData.show_header
         ];
 
         const quotationResult = await pool.query(quotationQuery, quotationValues);
@@ -177,8 +184,8 @@ const insertQuotation = async (request, response) => {
                 let productPriceToStore = product.product_price || product.product_wholesale_price;
 
                 const productQuery = `
-                    INSERT INTO quotation_product (qj_id, prd_id, product_name, product_price, product_description, product_quantity, unit_type, amount, other_productname)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                    INSERT INTO quotation_product (qj_id, prd_id, product_name, product_price, product_description, product_quantity, unit_type, amount, other_productname, product_wholesale_price)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
                     RETURNING prd_id`;
                 const productValues = [
                     qj_id,
@@ -189,7 +196,8 @@ const insertQuotation = async (request, response) => {
                     product.product_quantity,
                     product.unit_type,
                     product.amount,
-                    product.other_productname
+                    product.other_productname,
+                    product.product_wholesale_price,
                 ];
                 const productResult = await pool.query(productQuery, productValues);
                 const prdId = productResult.rows[0].prd_id;
