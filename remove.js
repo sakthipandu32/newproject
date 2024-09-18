@@ -3,14 +3,19 @@ const pool = require('./db');
 //deletecustomer...
 const deleteCustomer = async (request, response) => {
   const user_id = parseInt(request.params.user_id);
+
+  if (user_id === 1) {
+    return response.status(400).json({ error: "Cannot delete this user" });
+  }
   pool.query('DELETE FROM users WHERE user_id = $1', [user_id], (error) => {
     if (error) {
       response.status(500).json({ error: 'Internal server error' });
     } else {
-      response.status(200).send(`Company deleted with ID: ${user_id}`);
+      response.status(200).send(`User deleted with ID: ${user_id}`);
     }
   });
 };
+
 
 //deletecompany...
 const deleteCompany = async (request, response) => {
