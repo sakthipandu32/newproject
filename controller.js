@@ -248,7 +248,12 @@ const getData = async (request, response) => {
                     const tc_value = term.replace(/[\[\]{}"\\]/g, '').trim();
                     row.tc_value = tc_value;
                 }
-
+                if (row.product_name) {
+                    const text = row.product_name;
+                    const product_name = text.replace(/&#39;/g, "'").trim();
+                    row.product_name = product_name;
+                }
+                
                 if (TableName === 'users' && row.user_password !== '') {
                     row.user_password = '';
                 }
@@ -479,6 +484,12 @@ const getJobwork = async (request, response) => {
         `);
 
         const products = productQuery.rows.map(product => {
+            if (product.product_name) {
+                const text = product.product_name;
+                const processedName = text.replace(/&#39;/g, "'").trim();
+                product.product_name = processedName;
+            }
+            
             const { u_id, product_image, unit_id, unit_type, ...productData } = product;
             return {
                 ...productData,
@@ -723,7 +734,7 @@ const getQuotationpdf = async (request, response) => {
         </div>
         <div class="details">
       <div class="customer-info">
-    <h3 class="textcolor">Customer Info</h3>
+    <h4 class="textcolor">To :</h4>
     <p>${customer.first_name} ${customer.last_name ? customer.last_name : ''}<br>
         ${customer.client_name ? `  Client - ${customer.client_name}<br>` : ''}
        ${customer.address1 && customer.address2 ? `${customer.address2}, ${customer.address1}<br>` : customer.address1 ? `${customer.address1}<br>` : ''}
@@ -734,8 +745,8 @@ const getQuotationpdf = async (request, response) => {
     <p>
         <label>Date:</label> ${formattedQuotationDate}<br>
         <label>Document No:</label> ${quotation.document_no}<br>
-        <label>Salesperson:</label>  ${sales.first_name} ${sales.last_name ? sales.last_name : ''}<br>
-        <label>Prepared By:</label>  ${Prepared.first_name} ${Prepared.last_name ? Prepared.last_name : ''}<br>
+        <label>Rep:</label>  ${sales.first_name} ${sales.last_name ? sales.last_name : ''}<br>
+        ${Prepared ? (Prepared.last_name ?  `<label>Prepared By:</label>  ${Prepared.first_name} ${Prepared.last_name}` : Prepared.first_name) : ''}<br>
         ${approved ? (approved.last_name ? `<label>Approved By:</label> ${approved.first_name} ${approved.last_name}` : approved.first_name) : ''}
 
     </p>
@@ -749,7 +760,7 @@ const getQuotationpdf = async (request, response) => {
            
             ${quotation.est_caption ? `
                 <div  class="est-caption">
-                    <h2 class="textcolor">${quotation.est_caption}</h2>
+                    <h4 class="textcolor">${quotation.est_caption}</h4>
                 </div>
                 
             ` : ''}
@@ -815,22 +826,24 @@ const getQuotationpdf = async (request, response) => {
                 totalAmount += parseFloat(product.amount);
 
                 html += `
-                    <tr>
-                        <td style="width: 5%; text-align: center;">${serialNumber++}</td>
-                        <td style="width: 35%;">
-                            ${productName}<br>
-                            ${pro && pro.product_description ? `
-                                <span style="display: inline-block; max-width: 80%; text-align: left; padding-left: 40px; font-size: 16px;">
-                                    ${pro.product_description}
-                                </span>
-                            ` : ''}
-                        </td>
-                        <td style="width: 5%;">${unitType}</td>
-                        <td style="width: 10%; text-align: center;">${product.product_quantity}</td>
-                        <td style="width: 10%; text-align: right;">₹${price}</td>
-                        <td style="width: 10%; text-align: right;">₹${product.amount}</td>
-                    </tr>
-                `;
+                <tr>
+                    <td style="width: 5%; text-align: center;">${serialNumber++}</td>
+                    <td style="width: 35%;">
+                        ${productName}<br>
+                        ${pro && pro.product_description && pro.product_description !== 'nan' ? `
+                            <span style="display: inline-block; max-width: 80%; text-align: left; padding-left: 40px; font-size: 16px;">
+                                ${pro.product_description}
+                            </span>
+                        ` : `
+                        
+                        `}
+                    </td>
+                    <td style="width: 5%;">${unitType}</td>
+                    <td style="width: 10%; text-align: center;">${product.product_quantity}</td>
+                    <td style="width: 10%; text-align: right;">₹${price}</td>
+                    <td style="width: 10%; text-align: right;">₹${product.amount}</td>
+                </tr>
+            `;
             }
 
             html += `
