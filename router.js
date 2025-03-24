@@ -28,8 +28,6 @@ router.post('/jobwork', create.createJob);
 router.post('/terms', create.TermsConditions);
 router.post('/product', express.raw({type: '*/*', limit: '10mb'}), create.createProduct);
 router.post('/quotation', create.insertQuotation);
-router.post('/pacage', create.pacage);
-router.get('/pacage', create.getAllPackages);
 router.post('/duplicate/:quotationId', create.copyQuotation);
 
 

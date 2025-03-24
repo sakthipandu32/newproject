@@ -7,79 +7,6 @@ const createUser = async (request, response) => {
     const { first_name, last_name, user_password, email_id, phone_no, alter_no, website, address1, address2, city, zip_code, user_role, bank_name, bank_branch, bank_ac_no, ifsc_number, customer_gst_number, client_name } = request.body;
 
     try {
-        const checkTableQuery = `
-        SELECT EXISTS (
-          SELECT FROM information_schema.tables 
-          WHERE table_name IN ('user', 'company', 'jobwork', 'product', 'unit', 'terms_conditions','quotation', 'quotation_jobwork', 'quotation_product', 'Jobwork_product')
-        )`;
-
-        const tableExistsResult = await pool.query(checkTableQuery);
-        const validRoles = ['admin', 'salesperson', 'customer', 'staff'];
-        if (!validRoles.includes(user_role)) {
-            return response.status(400).json({ error: 'Invalid user role provided' });
-        }
-
-        if (!tableExistsResult.rows[0].exists) {
-            const createtableQuery = `
-          CREATE TABLE IF NOT EXISTS "users" ( user_id SERIAL PRIMARY KEY, first_name VARCHAR(250)  NOT NULL,  last_name VARCHAR(250) NOT NULL,  user_password VARCHAR(250),  email_id VARCHAR(250) NOT NULL,
-                                           phone_no BIGINT  NOT NULL, alter_no VARCHAR(250), website VARCHAR(250), address1 VARCHAR(250),  address2 VARCHAR(250), city VARCHAR(250),
-                                           zip_code BIGINT,  bank_name VARCHAR(250), bank_branch VARCHAR(250), bank_ac_no VARCHAR(250), 
-                                           ifsc_number VARCHAR(250), customer_gst_number VARCHAR(250), user_role VARCHAR(250) NOT NULL, client_name VARCHAR(250))`;
-            await pool.query(createtableQuery);
-
-        } if (!tableExistsResult.rows[0].exists) {
-            const companyTableQuery =
-                `CREATE TABLE IF NOT EXISTS company (company_id SERIAL PRIMARY KEY, company_name VARCHAR(250)  NOT NULL, company_email_id VARCHAR(250)  NOT NULL, company_phone_no BIGINT  NOT NULL, company_website VARCHAR(250)  , 
-           company_logo bytea, address1 VARCHAR(250),  address2 VARCHAR(250), city VARCHAR(250),  zip_code BIGINT,  bank_name VARCHAR(250), bank_branch VARCHAR(250), bank_ac_no VARCHAR(250), 
-           ifsc_number VARCHAR(250),  company_gst_number VARCHAR(250), alter_no BIGINT, landline_no VARCHAR(250))`;
-            await pool.query(companyTableQuery);
-        } if (!tableExistsResult.rows[0].exists) {
-            const jobworkTableQuery =
-                ` CREATE TABLE IF NOT EXISTS jobwork ( jobwork_id SERIAL PRIMARY KEY, jobwork_name VARCHAR(250) NOT NULL, jobwork_description VARCHAR(250))`;
-            await pool.query(jobworkTableQuery);
-            if (!tableExistsResult.rows[0].exists) {
-                const unitTableQuery =
-                    ` CREATE TABLE IF NOT EXISTS unit ( unit_id SERIAL PRIMARY KEY, unit_type VARCHAR(250) NOT NULL , unit_text VARCHAR(250) NOT NULL)`;
-                await pool.query(unitTableQuery);
-            }
-        } if (!tableExistsResult.rows[0].exists) {
-            const productTableQuery =
-                ` CREATE TABLE IF NOT EXISTS product ( product_id SERIAL PRIMARY KEY, product_image bytea, product_name VARCHAR(250) NOT NULL, product_price VARCHAR(250)  NOT NULL, product_description VARCHAR(250), 
-                                                      product_wholesale_price VARCHAR(250) NOT NULL, u_id INT REFERENCES unit(unit_id))`;
-            await pool.query(productTableQuery);
-        } if (!tableExistsResult.rows[0].exists) {
-            const termsTableQuery =
-                ` CREATE TABLE IF NOT EXISTS  terms_condition ( tc_id SERIAL PRIMARY KEY, terms_conditions_name  VARCHAR(300)  NOT NULL, tc_value VARCHAR(1000) NOT NULL )`;
-            await pool.query(termsTableQuery);
-
-        } if (!tableExistsResult.rows[0].exists) {
-            const qoutationTableQuery =
-                `CREATE TABLE IF NOT EXISTS quotation (
-                quotation_id SERIAL PRIMARY KEY,
-                quotation_type VARCHAR(250) NOT NULL,
-                customer_id INT NOT NULL, company_id INT NOT NULL,
-                est_caption VARCHAR(250) NOT NULL,
-                gst VARCHAR(250), rate VARCHAR(250), date DATE,  
-                terms_conditions VARCHAR(250), document_no VARCHAR(250), salesperson_id INT NOT NULL, 
-                prepared_by INT, additional_text VARCHAR(250),  additional_value VARCHAR(250), less_text VARCHAR(250), less_value VARCHAR(250), 
-                totalamount VARCHAR(250), gst_amount VARCHAR(250), less_amount VARCHAR(250), lessvalue_amount VARCHAR(250), amount_wo_gst VARCHAR(250),
-                show_header VARCHAR(250), approved_by VARCHAR(250), approved_status VARCHAR(250), created_at TIMESTAMP WITH TIME ZONE , modified_at TIMESTAMP WITH TIME ZONE, approved_at TIMESTAMP WITH TIME ZONE, selectedpricemethod VARCHAR(100), show_signature VARCHAR(100), advance_amount VARCHAR(100)) `;
-            await pool.query(qoutationTableQuery);
-        } if (!tableExistsResult.rows[0].exists) {
-            const QJTableQuery =
-                ` CREATE TABLE IF NOT EXISTS  quotation_jobwork  ( qj_id SERIAL PRIMARY KEY,  q_id INT REFERENCES quotation(quotation_id), job_id INT, jobwork_name VARCHAR(250), jobwork_description VARCHAR(250)  NULL )`;
-            await pool.query(QJTableQuery);
-        } if (!tableExistsResult.rows[0].exists) {
-            const QPTableQuery =
-                ` CREATE TABLE IF NOT EXISTS  quotation_product ( qp_id SERIAL PRIMARY KEY, prd_id INT, product_name VARCHAR(250), product_price VARCHAR(250), product_description VARCHAR(250)  NULL, product_quantity VARCHAR(250), unit_type VARCHAR(250), amount VARCHAR(250), other_productname VARCHAR(250))`;
-            await pool.query(QPTableQuery);
-        }
-        if (!tableExistsResult.rows[0].exists) {
-            const JPTableQuery =
-                ` CREATE TABLE IF NOT EXISTS Jobwork_product ( jp_id SERIAL PRIMARY KEY, product_id INT, job_id INT)`;
-            await pool.query(JPTableQuery);
-        }
-
         const userCheckQuery = 'SELECT * FROM "users" WHERE email_id = $1';
         if (email_id && email_id.trim() !== '') {
             const userCheckResult = await pool.query(userCheckQuery, [email_id]);
@@ -87,7 +14,6 @@ const createUser = async (request, response) => {
                 return response.status(400).json({ error: 'Email already exists' });
             }
         }
-
         let hashedPassword = null;
 
         if (user_password) {
@@ -132,9 +58,11 @@ const login = async (req, res) => {
                     const responseData = ['user', 'company', 'jobwork', 'terms&condition', 'product', 'unit', 'quotation'];
                     res.json({ success: true, message: 'Login successful', data: responseData, user_id: userId, userRole, initial });
                 }
-
-
-                else if (userRole === 'staff') {
+                else if (userRole === 'salesperson') {
+                    const responseData = ['user', 'quotation'];
+                    res.json({ success: true, message: 'Login successful', data: responseData, user_id: userId, userRole, initial });
+                } 
+               else if (userRole === 'staff') {
                     const responseData = ['user', 'jobwork', 'terms&condition', 'product', 'unit', 'quotation'];
                     res.json({ success: true, message: 'Login successful', data: responseData, user_id: userId, userRole, initial });
                 } else {
@@ -142,7 +70,7 @@ const login = async (req, res) => {
                 }
             } else {
                 res.status(401).json({ success: false, message: 'Invalid credentials' });
-            }
+            } 
         } else {
             res.status(401).json({ success: false, message: 'Invalid credentials' });
         }
@@ -308,76 +236,85 @@ const getSalesPerson = async (request, response) => {
     }
 };
 
-//getquotation...
+
 const getQuotation = async (request, response) => {
-    const orderBy = request.query.orderBy || 'quotation';
+    const orderBy = request.query.orderBy || 'quotation_id';
     const orderDirection = request.query.orderDirection || 'DESC';
-    
+
     try {
         const quotationQuery = `
-        SELECT * FROM quotation ORDER BY ${orderBy} ${orderDirection}`;
+        SELECT 
+            q.*, 
+            CONCAT(cust.first_name, cust.last_name) AS customer_name,
+            CONCAT(sales.first_name, sales.last_name) AS salesperson_name,
+            CONCAT(prep.first_name, prep.last_name) AS preparedby_name,
+            cust.address1, cust.address2, cust.city, cust.phone_no, cust.zip_code,
+            comp.company_name,
+            json_agg(
+                json_build_object(
+                    'qj_id', jq.qj_id,
+                    'q_id', jq.q_id,
+                    'job_id', jq.job_id,
+                    'jobwork_name', jq.jobwork_name,
+                    'jobwork_description', jq.jobwork_description,
+                    'productData', (
+                        SELECT json_agg(
+                            json_build_object(
+                                'qp_id', qp.qp_id,
+                                'qj_id', qp.qj_id,
+                                'prd_id', qp.prd_id,
+                                'product_name', qp.product_name,
+                                'product_quantity', qp.product_quantity,
+                                'product_price', qp.product_price,
+                                'product_description', qp.product_description,
+                                'unit_type', qp.unit_type,
+                                'amount', qp.amount,
+                                'other_productname', qp.other_productname,
+                                'product_wholesale_price', qp.product_wholesale_price,
+                                'actual_price', qp.actual_price,
+                                'actual_wholesale_price', qp.actual_wholesale_price
+                            )
+                            ORDER BY qp.qp_id ASC
+                        )
+                        FROM quotation_product qp 
+                        WHERE qp.qj_id = jq.qj_id
+                    )
+                )
+                ORDER BY jq.qj_id ASC
+            ) AS jobworkData
+        FROM 
+            quotation q
+        LEFT JOIN users cust ON q.customer_id = cust.user_id
+        LEFT JOIN users sales ON q.salesperson_id = sales.user_id
+        LEFT JOIN users prep ON q.prepared_by = prep.user_id
+        LEFT JOIN company comp ON q.company_id = comp.company_id
+        LEFT JOIN quotation_jobwork jq ON jq.q_id = q.quotation_id
+        GROUP BY q.quotation_id, cust.user_id, sales.user_id, prep.user_id, comp.company_id
+        ORDER BY ${orderBy} ${orderDirection}`;
+
         const quotationResult = await pool.query(quotationQuery);
         const quotations = quotationResult.rows;
 
         for (const quotation of quotations) {
-            const customerQuery = `SELECT first_name, last_name, address1, address2, city, phone_no, zip_code FROM users WHERE user_id = $1`;
-            const customerValues = [quotation.customer_id];
-            const customerResult = await pool.query(customerQuery, customerValues);
-            const customer = customerResult.rows[0];
-
-            const salesQuery = `SELECT first_name, last_name FROM users WHERE user_id = $1`;
-            const salesValues = [quotation.salesperson_id];
-            const salesResult = await pool.query(salesQuery, salesValues);
-            const sales = salesResult.rows[0];
-
-            const preparedQuery = `SELECT first_name, last_name FROM users WHERE user_id = $1`;
-            const preparedValues = [quotation.prepared_by];
-            const preparedResult = await pool.query(preparedQuery, preparedValues);
-            const prepared = preparedResult.rows[0];
-
-            const companyQuery = `
-            SELECT company_name FROM company WHERE company_id = $1`;
-            const companyValues = [quotation.company_id];
-            const companyResult = await pool.query(companyQuery, companyValues);
-            const company = companyResult.rows[0];
-
-            quotation.customer_name = customer ? `${customer.first_name} ${customer.last_name}` : '';
-            quotation.salesperson_name = sales ? `${sales.first_name} ${sales.last_name}` : '';
-            quotation.preparedby_name = prepared ? `${prepared.first_name} ${prepared.last_name}` : '';
-            quotation.company_name = company ? company.company_name : '';
-            quotation.address = customer ? `${customer.address1}, ${customer.address2}, ${customer.city}, ${customer.zip_code}, ${customer.phone_no}` : '';
-            quotation.customer_phone_no = customer ? `${customer.phone_no}` : '';
+            quotation.address = `${quotation.address1 || ''}, ${quotation.address2 || ''}, ${quotation.city || ''}, ${quotation.zip_code || ''}, ${quotation.phone_no || ''}`;
+            quotation.customer_phone_no = quotation.phone_no || '';
 
             const date = new Date(quotation.date);
             const formattedDate = `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
             quotation.quotation_date = formattedDate;
 
             quotation.approved_status = quotation.approved_status === '1' ? 'Approved' : 'Unapproved';
-
-
-
-            const jobworkQuery = `
-            SELECT * FROM quotation_jobwork WHERE q_id = $1`;
-            const jobworkValues = [quotation.quotation_id];
-            const jobworkResult = await pool.query(jobworkQuery, jobworkValues);
-            const jobworks = jobworkResult.rows;
-
-            for (const jobwork of jobworks) {
-                const productQuery = `
-                 SELECT * FROM quotation_product WHERE qj_id = $1 ORDER BY quotation_product ASC`;
-                const productValues = [jobwork.qj_id];
-                const productResult = await pool.query(productQuery, productValues);
-
-                jobwork.productData = productResult.rows;
-            }
-            quotation.jobworkData = jobworks;
         }
+
         response.status(200).json({ quotations });
     } catch (error) {
         response.status(500).json({ error: 'Internal server error' });
         console.error('Error fetching quotations:', error);
     }
 };
+
+
+
 
 const getproduct = async (request, response) => {
     try {
@@ -534,6 +471,7 @@ const getQuotationpdf = async (request, response) => {
         const customerResult = await pool.query(customerQuery, customerValues);
         const customer = customerResult.rows[0];
 
+
         const salesQuery = `SELECT first_name, last_name FROM users WHERE user_id = $1`;
         const salesValues = [quotation.salesperson_id];
         const salesResult = await pool.query(salesQuery, salesValues);
@@ -558,7 +496,7 @@ const getQuotationpdf = async (request, response) => {
         const quotationDate = new Date(quotation.date);
         const formattedQuotationDate = `${quotationDate.getDate()}-${quotationDate.getMonth() + 1}-${quotationDate.getFullYear()}`;
 
-        const jobworkQuery = `SELECT * FROM quotation_jobwork WHERE q_id = $1`;
+        const jobworkQuery = `SELECT * FROM quotation_jobwork WHERE q_id = $1 ORDER BY qj_id ASC`;
         const jobworkValues = [quotationId];
         const jobworkResult = await pool.query(jobworkQuery, jobworkValues);
         const jobworks = jobworkResult.rows;
@@ -795,7 +733,7 @@ const getQuotationpdf = async (request, response) => {
                 </tr>
             `;
 
-            const productQuery = `SELECT * FROM quotation_product WHERE qj_id = $1`;
+            const productQuery = `SELECT * FROM quotation_product WHERE qj_id = $1 ORDER BY qp_id ASC`;
             const productValues = [jobwork.qj_id];
             const productResult = await pool.query(productQuery, productValues);
             const products = productResult.rows;
@@ -813,33 +751,32 @@ const getQuotationpdf = async (request, response) => {
                     ? product.other_productname
                     : product.product_name;
 
-                const price = quotation.selectedpricemethod === 'WholeSalePrice' ? product.product_wholesale_price : product.product_price;
+                const price = quotation.selectedpricemethod === 'WholeSalePrice' ? parseFloat(product.product_wholesale_price).toFixed(2) : parseFloat(product.product_price).toFixed(2);
+                const quantity = parseFloat(product.product_quantity).toFixed(2);
 
                 let unitType = product.unit_type;
-                if (!isNaN(unitType)) {
-                    const unitTypeQuery = `SELECT unit_type FROM unit WHERE unit_id = $1`;
-                    const unitTypeResult = await pool.query(unitTypeQuery, [unitType]);
-                    unitType = unitTypeResult.rows[0] ? unitTypeResult.rows[0].unit_type : unitType;
-                }
+                // if (!isNaN(unitType)) {
+                //     const unitTypeQuery = `SELECT unit_type FROM unit WHERE unit_id = $1`;
+                //     const unitTypeResult = await pool.query(unitTypeQuery, [unitType]);
+                //     unitType = unitTypeResult.rows[0] ? unitTypeResult.rows[0].unit_type : unitType;
+                // }
 
                 jobworkSubtotal += parseFloat(product.amount);
                 totalAmount += parseFloat(product.amount);
 
                 html += `
                 <tr>
-                    <td style="width: 5%; text-align: center;">${serialNumber++}</td>
-                    <td style="width: 35%;">
-                        ${productName}<br>
+                   <td style="width: 5%; text-align: center;">${serialNumber++}</td>
+                   <td style="width: 35%;">
+                   ${productName}<br>
                         ${pro && pro.product_description && pro.product_description !== 'nan' ? `
                             <span style="display: inline-block; max-width: 80%; text-align: left; padding-left: 40px; font-size: 16px;">
                                 ${pro.product_description}
                             </span>
-                        ` : `
-                        
-                        `}
-                    </td>
+            ` : ``}
+               </td>
                     <td style="width: 5%;">${unitType}</td>
-                    <td style="width: 10%; text-align: center;">${product.product_quantity}</td>
+                    <td style="width: 10%; text-align: center;">${quantity}</td>
                     <td style="width: 10%; text-align: right;">₹${price}</td>
                     <td style="width: 10%; text-align: right;">₹${product.amount}</td>
                 </tr>
@@ -979,10 +916,11 @@ html += `
             </tr>
      
        
-            <tr>
-                <td>${quotation.additional_text}</td>
-                <td style="text-align: right;">₹${quotation.additional_value}</td>
-            </tr>
+       <tr>
+           <td>${quotation.additional_text}</td>
+           <td style="text-align: right;">₹${parseFloat(quotation.additional_value).toFixed(2)}</td>
+       </tr>
+
        
         ${(quotation.less_value || quotation.less_amount > 0) ? `
             <tr>
@@ -1065,52 +1003,53 @@ if (quotation.quotation_type === 'Estimates' && quotation.terms_conditions && qu
 if (quotation.quotation_type === 'Estimates' && quotation.show_header === 'true') {
     html += `
     </ul>
-    <div>
-       
-        <h3 class="textcolor">Bank Details</h3>
-        <ul>
-        <table class="bank" style="width:50%; border-collapse: collapse; border: none; page-break-inside: avoid; line-height: 1.25;">
-            <tr>
-                <td style="padding: 3px;"><label>Accounts Name</label></td>
-                <td style="padding: 3px;">- ${company.company_name}</td>
-            </tr>
-            <tr>
-                <td style="padding: 3px;"><label>Account No</label></td>
-                <td style="padding: 3px;">- ${company.bank_ac_no}</td>
-            </tr>
-            <tr>
-                <td style="padding: 3px;"><label>Bank</label></td>
-                <td style="padding: 3px;">- ${company.bank_name}</td>
-            </tr>
-            <tr>
-                <td style="padding: 3px;"><label>Branch</label></td>
-                <td style="padding: 3px;">- ${company.bank_branch}</td>
-            </tr>
-            <tr>
-                <td style="padding: 3px;"><label>IFSC</label></td>
-                <td style="padding: 3px;">- ${company.ifsc_number}</td>
-            </tr>
+    <div style="display: flex; justify-content: space-between; align-items: start;">
+        <div>
+            <h3 class="textcolor">Bank Details</h3>
+            <ul>
+            <table class="bank" style="width:150%; border-collapse: collapse; border: none; page-break-inside: avoid; line-height: 1.25;">
+                <tr>
+                    <td style="padding: 3px;"><label>Accounts Name</label></td>
+                    <td style="padding: 3px;">- ${company.company_name}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 3px;"><label>Account No</label></td>
+                    <td style="padding: 3px;">- ${company.bank_ac_no}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 3px;"><label>Bank</label></td>
+                    <td style="padding: 3px;">- ${company.bank_name}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 3px;"><label>Branch</label></td>
+                    <td style="padding: 3px;">- ${company.bank_branch}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 3px;"><label>IFSC</label></td>
+                    <td style="padding: 3px;">- ${company.ifsc_number}</td>
+                </tr>
             </ul>
-        </table>
-    </div>
+            </table>
+        </div>
     `;
 }
 
-
 if (quotation.show_signature === 'true' && quotation.quotation_type === 'Estimates') {
     html += `
-    <div style="height: 30px;"></div>
-    <div style="text-align: right; font-weight: bold;">
-        <p>for ${company.company_name}</p>
-    </div>
+        <div style="text-align: right; margin-left: auto; margin-top: 100px;">
+            <p style="font-weight: bold;">for ${company.company_name}</p><br>
+            <p style="text-align: center; margin-top: 10px;">Authorised Signatory</p>
+        </div>
+    </div> <!-- Closing the flex container -->
     `;
 } else if (quotation.show_signature === 'false' && quotation.quotation_type === 'Estimates') {
     html += `
-    <div style="height: 30px;"></div>
-    <div style="text-align: right; font-weight: bold;">
-        <p>This is a computer generated ${quotation.quotation_type} no signature required</p>
-    </div>
-   <hr> `;
+        <div style="text-align: right; font-weight: bold; margin-left: auto; margin-top: 170px;">
+            <p>This is a computer generated ${quotation.quotation_type} no signature required</p>
+        </div>
+        <hr>
+    </div> <!-- Closing the flex container -->
+   `;
 }
 
 

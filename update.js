@@ -131,7 +131,7 @@ const updateTerms = async (request, response) => {
 
 //updatequotations...
 const updateQuotation = async (request, response) => {
-    const { quotationData, jobworkData } = request.body;
+    const { quotationData, jobworkdata } = request.body;
     const quotationId = parseInt(request.params.quotationId, 10);
     const client = await pool.connect();
 
@@ -174,7 +174,7 @@ const updateQuotation = async (request, response) => {
         const currentJobworkIds = await client.query('SELECT qj_id FROM quotation_jobwork WHERE q_id = $1', [quotationId]);
         const currentJobworkIdSet = new Set(currentJobworkIds.rows.map(row => row.qj_id));
 
-        const requestJobworkIds = new Set(jobworkData.map(jobwork => jobwork.qj_id));
+        const requestJobworkIds = new Set(jobworkdata.map(jobwork => jobwork.qj_id));
 
         for (const qj_id of currentJobworkIdSet) {
             if (!requestJobworkIds.has(qj_id)) {
@@ -183,7 +183,7 @@ const updateQuotation = async (request, response) => {
             }
         }
 
-        for (const jobwork of jobworkData) {
+        for (const jobwork of jobworkdata) {
             const { qj_id, q_id, job_id, jobwork_name, jobwork_description, productData } = jobwork;
 
             const jobworkIdQuery = `SELECT jobwork_id FROM jobwork WHERE jobwork_name = $1`;
@@ -301,9 +301,11 @@ const aprovedQuotation = async (request, response) => {
     const statusToUpdate = approved_status === 1 ? 1 : 0;
 
     try {
+        const approvedByValue = statusToUpdate === 0 ? null : approved_by;
+
         await pool.query(
             'UPDATE quotation SET approved_by = $1, approved_status = $2, approved_at = $3 WHERE quotation_id = $4',
-            [approved_by, statusToUpdate, new Date(), quotationId]
+            [approvedByValue, statusToUpdate, statusToUpdate === 1 ? new Date() : null, quotationId]
         );
 
         const approvedFlag = statusToUpdate === 1 ? 1 : 0;
@@ -314,6 +316,7 @@ const aprovedQuotation = async (request, response) => {
         response.status(500).json({ error: 'Internal server error' });
     }
 };
+
 
 //update modules...
 module.exports = {

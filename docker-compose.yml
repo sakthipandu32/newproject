@@ -1,4 +1,3 @@
-version: "3.8"
 services:
   gscomp-server:
     container_name: gscompany

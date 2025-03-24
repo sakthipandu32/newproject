@@ -101,7 +101,7 @@ const createProduct = async (request, response) => {
 
 //createquotation...
 const insertQuotation = async (request, response) => {
-    const { quotationData, jobworkData } = request.body;
+    const { quotationData, jobworkdata } = request.body;
     try {
         const currentDate = new Date();
         const year = currentDate.getFullYear().toString().slice(-2);
@@ -164,7 +164,7 @@ const insertQuotation = async (request, response) => {
         const quotationId = quotationResult.rows[0].quotation_id;
 
 
-        for (const jobwork of jobworkData) {
+        for (const jobwork of jobworkdata) {
             const { jobwork_name, jobwork_description, productData } = jobwork;
             const JobworQuery = `
             SELECT jobwork_id FROM jobwork WHERE jobwork_name = $1`;
@@ -264,7 +264,7 @@ const copyQuotation = async (request, response) => {
         const lastQuotationQuery = `SELECT MAX(SUBSTRING(document_no, 8)::int) AS last_document_no FROM quotation WHERE document_no LIKE '${QuotationType}${formattedDate}%'`;
         const lastQuotationResult = await pool.query(lastQuotationQuery);
         const lastDocumentNo = lastQuotationResult.rows[0].last_document_no || 0;
-        const documentNo = `${QuotationType}${formattedDate}${('0' + (lastDocumentNo + 1)).slice(-2)}`;
+        const documentNo = `${QuotationType}${formattedDate}${('0' + (lastDocumentNo + 1))}`;
        
         const approvedStatus = Quotation.approved_status === '1' ? '0' : Quotation.approved_status;
         const approvedAt = Quotation.approved_status ? new Date() : null;
@@ -378,34 +378,6 @@ const copyQuotation = async (request, response) => {
 
 
 
-const pacage = async (request, response) => {
-    const { place, days } = request.body;
-
-    try {
-        // Insert the package data
-        await pool.query(
-            'INSERT INTO pacage (place, days) VALUES ($1, $2)',
-            [place, JSON.stringify(days)]
-        );
-
-        response.status(201).json({ message: 'Package created successfully' });
-    } catch (error) {
-        console.error('Error:', error);
-        response.status(500).json({ error: 'Internal server error' });
-    }
-};
-
-const getAllPackages = async (request, response) => {
-    try {
-        const result = await pool.query('SELECT * FROM pacage');
-        response.status(200).json(result.rows);
-    } catch (error) {
-        console.error('Error:', error);
-        response.status(500).json({ error: 'Internal server error' });
-    }
-};
-
-
 
 //create modules...
 module.exports = {
@@ -415,7 +387,5 @@ module.exports = {
     createProduct,
     createUnit,
     insertQuotation,
-    pacage,
-    getAllPackages,
     copyQuotation,
 }
